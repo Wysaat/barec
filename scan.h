@@ -1,0 +1,1 @@
+char *scan(FILE *stream);
