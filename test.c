@@ -1,15 +1,14 @@
-int a = 3;
-5 + 7;
-mov    eax, 5
-add    eax, 7
-mov    b, eax
-int b; allocating on the stack...
-int b = 3 + 4;
-int c = b + 3;
+#include <stdio.h>
 
 int main() {
-    int a = 3;
-    int b = 4;
-    int c = a + b;
-    return c; return value on eax return address...
+	char *a = "Hello";
+	int g;
+	int m;
+	3, 4, 5, a = "Bye", g = m = 1024;
+	puts(a);
+	printf("%d\n", g);
+	printf("%d\n", m);
+	return 0;
 }
+
+mov    [ebp-4], eax

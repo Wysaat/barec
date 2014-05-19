@@ -132,6 +132,51 @@ char *scan(FILE *stream) {
     return buffer;
 }
 
+void parse_declaration(FILE *stream, scope *local_scope) {
+    char *token = scan(stream);
+    if (!strcmp(token, "int")) {
+        token = scan(stream);
+        int addr = declare(token, int_t, local_scope);
+        token = scan(stream);
+        if (!strcmp(tokenn, ";"))
+            ungetc(';', stream);
+        else if (!strcmp(token, "=")) {
+            parse_expression(stream, local_scope);
+            emit("mov [ebp-");
+            emit(itoa(addr));
+            emit("], eax\n");
+        }
+    }
+}
+
+int declare(char *token, int type, scope *local_scope) {
+    int addr = local_scope->next_addr;
+    if (type == int_t) {
+        local_scope->next_addr += 4;
+    }
+}
+
+char *itoa(int value) {
+    int n = 0;
+    int num = value;
+    if (num == 0) {
+        return "0";
+    }
+    while (num > 0) {
+        num = num / 10;
+        n++;
+    }
+
+    char *retptr = (char *)malloc(n+1);
+    retptr[n] = 0;
+    int i;
+    for (i = 1; i <= n; i++) {
+        retptr[n-i] = value%10 + '0';
+        value = value / 10;
+    }
+    return retptr;
+}
+
 int main()
 {
     FILE *stream = fopen("test.c", "r");
