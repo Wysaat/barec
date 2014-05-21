@@ -1,14 +1,15 @@
-#include <stdio.h>
+3 << 2 + 4 * 5 / 7;
+3 > 2 <= 4
 
-int main() {
-	char *a = "Hello";
-	int g;
-	int m;
-	3, 4, 5, a = "Bye", g = m = 1024;
-	puts(a);
-	printf("%d\n", g);
-	printf("%d\n", m);
-	return 0;
-}
+3 > 2
 
-mov    [ebp-4], eax
+mov    eax, 3
+mov    ebx, 2
+cmp    eax, ebx
+jng    tag1
+mov    eax, 1
+jmp    tag2
+tag1:
+mov    eax, 0
+tag2:
+ret

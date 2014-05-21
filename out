@@ -1,0 +1,21 @@
+mov    eax, 3
+push   eax
+mov    eax, 2
+push   eax
+mov    eax, 4
+push   eax
+mov    eax, 5
+pop    ebx
+xchg   eax, ebx
+mul    eax
+push   eax
+mov    eax, 7
+pop    ebx
+xchg   eax, ebx
+div    ebx
+pop    ebx
+xchg   eax, ebx
+add    eax, ebx
+pop    ecx
+xchg   eax, ecx
+shl    eax, cl

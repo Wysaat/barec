@@ -1,6 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "scan.h"
+#include "scope.h"
+#include "types.h"
+#include "utils.h"
 
 char *scan(FILE *stream) {
     char *buffer = (char *)malloc(1024);
@@ -132,19 +136,182 @@ char *scan(FILE *stream) {
     return buffer;
 }
 
-void parse_declaration(FILE *stream, scope *local_scope) {
+void parse_constant(FILE *stream, scope *local_scope) {
     char *token = scan(stream);
+    if (is_integer_const(token)) {
+        emit("mov    eax, ");
+        emit(token);
+        emit("\n");
+    }
+    else if (is_character_const(token)) {
+        emit("mov    eax, ");
+        emit(token);
+        emit("\n");
+    }
+}
+
+void parse_primary_expression(FILE *stream, scope *local_scope) {
+    parse_constant(stream, local_scope);
+}
+
+void parse_postfix_expression(FILE *stream, scope *local_scope) {
+    parse_primary_expression(stream, local_scope);
+}
+
+void parse_unary_expression(FILE *stream, scope *local_scope) {
+    parse_postfix_expression(stream, local_scope);
+}
+
+void parse_cast_expression(FILE *stream, scope *local_scope) {
+    parse_unary_expression(stream, local_scope);
+}
+
+void parse_multiplicative_expression(FILE *stream, scope *local_scope) {
+    char *token = 0;
+    while (1) {
+        parse_cast_expression(stream, local_scope);
+        if (token) {
+            emit("pop    ebx\n");
+            emit("xchg   eax, ebx\n");
+            if (!strcmp(token, "*"))
+                emit("mul    eax\n");
+            else if (!strcmp(token, "/"))
+                emit("div    ebx\n");
+            else if (!strcmp(token, "%")) {
+                emit("div    ebx\n");
+                emit("mov    eax, edx\n");
+            }
+        }
+        token = scan(stream);
+        if (!strcmp(token, "*") || !strcmp(token, "/") || !strcmp(token, "%")) {
+            emit("push   eax\n");
+        }
+        else {
+            unscan(token, stream);
+            break;
+        }
+    }
+}
+
+void parse_additive_expression(FILE *stream, scope *local_scope) {
+    char *token = 0;
+    while (1) {
+        parse_multiplicative_expression(stream, local_scope);
+        if (token) {
+            emit("pop    ebx\n");
+            emit("xchg   eax, ebx\n");
+            if (!strcmp(token, "+"))
+                emit("add    eax, ebx\n");
+            else
+                emit("sub    eax, ebx\n");
+        }
+        token = scan(stream);
+        if (!strcmp(token, "+") || !strcmp(token, "-")) {
+            emit("push   eax\n");
+        }
+        else {
+            unscan(token, stream);
+            break;
+        }
+    }
+}
+
+void parse_shift_expression(FILE *stream, scope *local_scope) {
+    char *token = 0;
+    while (1) {
+        parse_additive_expression(stream, local_scope);
+        if (token) {
+            emit("pop    ecx\n");
+            emit("xchg   eax, ecx\n");
+            if (!strcmp(token, "<<"))
+                emit("shl    eax, cl\n");
+            else
+                emit("shr    eax, cl\n");
+        }
+        token = scan(stream);
+        if (!strcmp(token, "<<") || !strcmp(token, ">>"))
+            emit("push   eax\n");
+        else {
+            unscan(token, stream);
+            break;
+        }
+    }
+}
+
+void parse_relational_expression(FILE *stream, scope *local_scope) {
+    char *token = 0;
+    while (1) {
+        parse_shift_expression(stream, local_scope);
+        if (token) {
+            emit("pop    ebx\n");
+            emit("xchg   eax, ebx\n");
+            if (!strcmp(token, "<")) {
+                emit("cmp    eax, ebx\n");
+                emit("jg     ");
+            }
+        }
+        token = scan(stream);
+        if (!strcmp(token, "<") || !strcmp(token, ">") || !strcmp(token, "<=") || !strcmp(token, ">="))
+            emit("push   eax\n");
+        else {
+            unscan(token, stream);
+            break;
+        }
+    }
+}
+
+void parse_conditional_expression(FILE *stream, scope *local_scope) {
+    parse_relational_expression(stream, local_scope);
+}
+
+void parse_assignment_expression(FILE *stream, scope *local_scope) {
+    parse_conditional_expression(stream, local_scope);
+}
+
+void parse_expression(FILE *stream, scope *local_scope) {
+    char *token;
+    while (1) {
+        parse_assignment_expression(stream, local_scope);
+        token = scan(stream);
+        if (!strcmp(token, ";")) {
+            break;
+        }
+    }
+}
+
+void parse_expression_statement(FILE *stream, scope *local_scope) {
+    char *token = scan(stream);
+    if (!strcmp(token, ";"))
+        return;
+    unscan(token, stream);
+    parse_expression(stream, local_scope);
+    token = scan(stream);
+    if (!strcmp(token, ";"))
+        return;
+}
+
+void parse_statement(FILE *stream, scope *local_scope) {
+    parse_expression_statement(stream, local_scope);
+}
+
+int parse_declaration(FILE *stream, scope *local_scope) {
+    char *token = scan(stream);
+    if (!*token)
+        return -1;
     if (!strcmp(token, "int")) {
         token = scan(stream);
         int addr = declare(token, int_t, local_scope);
         token = scan(stream);
-        if (!strcmp(tokenn, ";"))
-            ungetc(';', stream);
+        if (!strcmp(token, ";"))
+            return 0;
         else if (!strcmp(token, "=")) {
             parse_expression(stream, local_scope);
-            emit("mov [ebp-");
+            emit("mov dword [ebp-");
             emit(itoa(addr));
             emit("], eax\n");
+            token = scan(stream);
+            if (!strcmp(token, ";"))
+                return 0;
         }
     }
 }
@@ -153,38 +320,20 @@ int declare(char *token, int type, scope *local_scope) {
     int addr = local_scope->next_addr;
     if (type == int_t) {
         local_scope->next_addr += 4;
+        if (local_scope->vals)
+            val_list_append(local_scope->vals, token, addr);
+        else
+            local_scope->vals = val_list_node(token, addr);
     }
-}
-
-char *itoa(int value) {
-    int n = 0;
-    int num = value;
-    if (num == 0) {
-        return "0";
-    }
-    while (num > 0) {
-        num = num / 10;
-        n++;
-    }
-
-    char *retptr = (char *)malloc(n+1);
-    retptr[n] = 0;
-    int i;
-    for (i = 1; i <= n; i++) {
-        retptr[n-i] = value%10 + '0';
-        value = value / 10;
-    }
-    return retptr;
+    return addr;
 }
 
 int main()
 {
+    system("rm out");
     FILE *stream = fopen("test.c", "r");
-    char *buffer;
-    while (1) {
-        buffer = scan(stream);
-        if (!*buffer)
-            break;
-        puts(buffer);
-    }
+    scope *local_scope = scope_init();
+    parse_statement(stream, local_scope);
+
+    return 0;
 }
