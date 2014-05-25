@@ -1,15 +1,7 @@
-3 << 2 + 4 * 5 / 7;
-3 > 2 <= 4
+int a, b;
 
-3 > 2
-
-mov    eax, 3
-mov    ebx, 2
-cmp    eax, ebx
-jng    tag1
-mov    eax, 1
-jmp    tag2
-tag1:
-mov    eax, 0
-tag2:
-ret
+3 + 4;
+int c;
+c = 4, a = 423;
+b = c * 2 - a + 5 * 4;
+int *a = 4;

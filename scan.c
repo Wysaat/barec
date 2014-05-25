@@ -136,9 +136,21 @@ char *scan(FILE *stream) {
     return buffer;
 }
 
-void parse_constant(FILE *stream, scope *local_scope) {
+void parse_primary_expression(FILE *stream, scope *local_scope) {
     char *token = scan(stream);
-    if (is_integer_const(token)) {
+    // convention: put the address on ebx, for assignments
+    if (is_identifier(token)) {
+        char *next_token = scan(stream);
+        unscan(next_token, stream);
+        if (local_scope->decl_type && !strcmp(next_token, "=") || !strcmp(next_token, ",") || !strcmp(next_token, ";"))
+            declare(local_scope, token);
+        emit("lea    ebx, ");
+        emit("[ebp-");
+        emit(itoa(find_addr(local_scope, token)));
+        emit("]\n");
+        emit("mov    eax, [ebx]\n");
+    }
+    else if (is_integer_const(token)) {
         emit("mov    eax, ");
         emit(token);
         emit("\n");
@@ -148,10 +160,6 @@ void parse_constant(FILE *stream, scope *local_scope) {
         emit(token);
         emit("\n");
     }
-}
-
-void parse_primary_expression(FILE *stream, scope *local_scope) {
-    parse_constant(stream, local_scope);
 }
 
 void parse_postfix_expression(FILE *stream, scope *local_scope) {
@@ -174,7 +182,7 @@ void parse_multiplicative_expression(FILE *stream, scope *local_scope) {
             emit("pop    ebx\n");
             emit("xchg   eax, ebx\n");
             if (!strcmp(token, "*"))
-                emit("mul    eax\n");
+                emit("mul    ebx\n");
             else if (!strcmp(token, "/"))
                 emit("div    ebx\n");
             else if (!strcmp(token, "%")) {
@@ -245,10 +253,26 @@ void parse_relational_expression(FILE *stream, scope *local_scope) {
         if (token) {
             emit("pop    ebx\n");
             emit("xchg   eax, ebx\n");
-            if (!strcmp(token, "<")) {
-                emit("cmp    eax, ebx\n");
-                emit("jg     ");
-            }
+            emit("cmp    eax, ebx\n");
+            if (!strcmp(token, ">"))
+                emit("jng    tag");
+            else if (!strcmp(token, "<"))
+                emit("jnl    tag");
+            else if (!strcmp(token, ">="))
+                emit("jl     tag");
+            else
+                emit("jg     tag");
+            int tag1 = tag++;
+            emit(itoa(tag1));
+            emit("\nmov    eax, 1\n");
+            emit("jmp    tag");
+            int tag2 = tag++;
+            emit(itoa(tag2));
+            emit("\ntag");
+            emit(itoa(tag1));
+            emit(":\nmov    eax, 0\ntag");
+            emit(itoa(tag2));
+            emit(":\n");
         }
         token = scan(stream);
         if (!strcmp(token, "<") || !strcmp(token, ">") || !strcmp(token, "<=") || !strcmp(token, ">="))
@@ -260,12 +284,189 @@ void parse_relational_expression(FILE *stream, scope *local_scope) {
     }
 }
 
+void parse_equality_expression(FILE *stream, scope *local_scope) {
+    char *token = 0;
+    while (1) {
+        parse_relational_expression(stream, local_scope);
+        if (token) {
+            emit("pop    ebx\n");
+            emit("xchg   eax, ebx\n");
+            emit("cmp    eax, ebx\n");
+            if (!strcmp(token, "=="))
+                emit("jne    tag");
+            else
+                emit("je     tag");
+            int tag1 = tag++;
+            emit(itoa(tag1));
+            emit("\nmov    eax, 1\n");
+            emit("jmp    tag");
+            int tag2 = tag++;
+            emit(itoa(tag2));
+            emit("\ntag");
+            emit(itoa(tag1));
+            emit(":\nmov    eax, 0\ntag");
+            emit(itoa(tag2));
+            emit(":\n");
+        }
+        token = scan(stream);
+        if (!strcmp(token, "==") || !strcmp(token, "!="))
+            emit("push   eax\n");
+        else {
+            unscan(token, stream);
+            break;
+        }
+    }
+}
+
+void parse_and_expression(FILE *stream, scope *local_scope) {
+    char *token = 0;
+    while (1) {
+        parse_equality_expression(stream, local_scope);
+        if (token) {
+            emit("pop    ebx\n");
+            emit("xchg   eax, ebx\n");
+            emit("and    eax, ebx\n");
+        }
+        token = scan(stream);
+        if (!strcmp(token, "&"))
+            emit("push   eax\n");
+        else {
+            unscan(token, stream);
+            break;
+        }
+    }
+}
+
+void parse_exclusive_or_expression(FILE *stream, scope *local_scope) {
+    char *token = 0;
+    while (1) {
+        parse_and_expression(stream, local_scope);
+        if (token) {
+            emit("pop    ebx\n");
+            emit("xchg   eax, ebx\n");
+            emit("xor    eax, ebx\n");
+        }
+        token = scan(stream);
+        if (!strcmp(token, "^"))
+            emit("push   eax\n");
+        else {
+            unscan(token, stream);
+            break;
+        }
+    }
+}
+
+void parse_inclusive_or_expression(FILE *stream, scope *local_scope) {
+    char *token = 0;
+    while (1) {
+        parse_exclusive_or_expression(stream, local_scope);
+        if (token) {
+            emit("pop    ebx\n");
+            emit("xchg   eax, ebx\n");
+            emit("or    eax, ebx\n");
+        }
+        token = scan(stream);
+        if (!strcmp(token, "|"))
+            emit("push   eax\n");
+        else {
+            unscan(token, stream);
+            break;
+        }
+    }
+}
+
+void parse_logical_and_expression(FILE *stream, scope *local_scope) {
+    char *token = 0;
+    while (1) {
+        parse_inclusive_or_expression(stream, local_scope);
+        if (token) {
+            emit("pop    ebx\n");
+            emit("xchg   eax, ebx\n");
+            emit("cmp    eax, 0\n");
+            emit("je     tag");
+            int tag1 = tag++;
+            emit(itoa(tag1));
+            emit("\ncmp    ebx, 0\n");
+            emit("jne    tag");
+            int tag2 = tag++;
+            emit(itoa(tag2));
+            emit("\ntag");
+            emit(itoa(tag1));
+            emit(":\nmov    eax, 0\n");
+            emit("jmp    tag");
+            int tag3 = tag++;
+            emit(itoa(tag3));
+            emit("\ntag");
+            emit(itoa(tag2));
+            emit(":\nmov    eax, 1\n");
+            emit("tag");
+            emit(itoa(tag3));
+            emit(":\n");
+        }
+        token = scan(stream);
+        if (!strcmp(token, "&&"))
+            emit("push   eax\n");
+        else {
+            unscan(token, stream);
+            break;
+        }
+    }
+}
+
+void parse_logical_or_expression(FILE *stream, scope *local_scope) {
+    char *token = 0;
+    while (1) {
+        parse_logical_and_expression(stream, local_scope);
+        if (token) {
+            emit("pop    ebx\n");
+            emit("xchg   eax, ebx\n");
+            emit("cmp    eax, 0\n");
+            emit("jne    tag");
+            int tag1 = tag++;
+            emit(itoa(tag1));
+            emit("\ncmp    ebx, 0\n");
+            emit("je     tag");
+            int tag2 = tag++;
+            emit(itoa(tag2));
+            emit("\ntag");
+            emit(itoa(tag1));
+            emit(":\nmov    eax, 1\n");
+            emit("jmp    tag");
+            int tag3 = tag++;
+            emit(itoa(tag3));
+            emit("\ntag");
+            emit(itoa(tag2));
+            emit(":\nmov    eax, 0\n");
+            emit("tag");
+            emit(itoa(tag3));
+            emit(":\n");
+        }
+        token = scan(stream);
+        if (!strcmp(token, "||"))
+            emit("push   eax\n");
+        else {
+            unscan(token, stream);
+            break;
+        }
+    }
+}
+
+
 void parse_conditional_expression(FILE *stream, scope *local_scope) {
-    parse_relational_expression(stream, local_scope);
+    parse_logical_or_expression(stream, local_scope);
 }
 
 void parse_assignment_expression(FILE *stream, scope *local_scope) {
     parse_conditional_expression(stream, local_scope);
+    char *token = scan(stream);
+    if (!strcmp(token, "=")) {
+        emit("push   ebx\n");
+        parse_assignment_expression(stream, local_scope);
+        emit("pop    ebx\n");
+        emit("mov    [ebx], eax\n");
+    }
+    else
+        unscan(token, stream);
 }
 
 void parse_expression(FILE *stream, scope *local_scope) {
@@ -274,6 +475,7 @@ void parse_expression(FILE *stream, scope *local_scope) {
         parse_assignment_expression(stream, local_scope);
         token = scan(stream);
         if (!strcmp(token, ";")) {
+            unscan(token, stream);
             break;
         }
     }
@@ -281,8 +483,10 @@ void parse_expression(FILE *stream, scope *local_scope) {
 
 void parse_expression_statement(FILE *stream, scope *local_scope) {
     char *token = scan(stream);
-    if (!strcmp(token, ";"))
+    if (!strcmp(token, ";")) {
+        emit("");
         return;
+    }
     unscan(token, stream);
     parse_expression(stream, local_scope);
     token = scan(stream);
@@ -294,46 +498,58 @@ void parse_statement(FILE *stream, scope *local_scope) {
     parse_expression_statement(stream, local_scope);
 }
 
-int parse_declaration(FILE *stream, scope *local_scope) {
+void parse_declaration(FILE *stream, scope *local_scope, int decl) {
     char *token = scan(stream);
-    if (!*token)
-        return -1;
-    if (!strcmp(token, "int")) {
-        token = scan(stream);
-        int addr = declare(token, int_t, local_scope);
-        token = scan(stream);
-        if (!strcmp(token, ";"))
-            return 0;
-        else if (!strcmp(token, "=")) {
-            parse_expression(stream, local_scope);
-            emit("mov dword [ebp-");
-            emit(itoa(addr));
-            emit("], eax\n");
-            token = scan(stream);
-            if (!strcmp(token, ";"))
-                return 0;
-        }
+    if (decl) {
+        if (!strcmp(token, "int"))
+            local_scope->decl_type = int_t;
     }
-}
-
-int declare(char *token, int type, scope *local_scope) {
-    int addr = local_scope->next_addr;
-    if (type == int_t) {
-        local_scope->next_addr += 4;
-        if (local_scope->vals)
-            val_list_append(local_scope->vals, token, addr);
-        else
-            local_scope->vals = val_list_node(token, addr);
-    }
-    return addr;
+    parse_expression(stream, local_scope);
+    token = scan(stream);
+    if (!strcmp(token, ";"))
+        local_scope->decl_type = 0;
 }
 
 int main()
 {
-    system("rm out");
+    system("touch out && rm out");
     FILE *stream = fopen("test.c", "r");
     scope *local_scope = scope_init();
-    parse_statement(stream, local_scope);
+    local_scope->next_addr += 4;  /* push   ebp */
+    char *token;
+    while (1) {
+        token = scan(stream);
+        if (!*token)
+            break;
+        unscan(token, stream);
+        if (!strcmp(token, "int"))
+            parse_declaration(stream, local_scope, 1);
+        else
+            parse_statement(stream, local_scope);
+    }
+    fclose(stream);
+
+    printf("local_scope->next_addr is %d\n", local_scope->next_addr);
+
+    system("touch out && rm out");
+
+    emit("push   ebp\n");
+    emit("mov    ebp, esp\n");
+    emit("sub    esp, ");
+    emit(itoa(local_scope->next_addr));
+    emit("\n");
+
+    stream = fopen("test.c", "r");
+    while (1) {
+        token = scan(stream);
+        if (!*token)
+            break;
+        unscan(token, stream);
+        if (!strcmp(token, "int"))
+            parse_declaration(stream, local_scope, 0);
+        else
+            parse_statement(stream, local_scope);
+    }
 
     return 0;
 }

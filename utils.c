@@ -25,6 +25,10 @@ void emitln(char *words) {
     fclose(stream);
 }
 
+int is_identifier(char *token) {
+    return (*token == '_' || (*token >= 'a' && *token <= 'z') || (*token >= 'A' && *token <= 'Z'));
+}
+
 int is_integer_const(char *token) {
     while (*token)
         if (!(*token >= '0' && *token++ <= '9'))
@@ -33,9 +37,7 @@ int is_integer_const(char *token) {
 }
 
 int is_character_const(char *token) {
-	if (*token == '\'')
-		return 1;
-	return 0;
+	return (*token == '\'');
 }
 
 char *itoa(int value) {

@@ -1,0 +1,1 @@
+linking 32 bit files on 64 bit linux: -melf_i386 (see http://www.stepbystep.ishipaco.com)
