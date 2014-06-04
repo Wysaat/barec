@@ -1,1 +1,7 @@
 linking 32 bit files on 64 bit linux: -melf_i386 (see http://www.stepbystep.ishipaco.com)
+
+gcc compile 32 bit on 64 bit linux: -m32
+first do: sudo apt-get install gcc-multilib
+
+32 bit: int 4 byte, long 4 byte, long long 8 byte
+64 bit: int 4 byte, long 8 byte, long long 8 byte
