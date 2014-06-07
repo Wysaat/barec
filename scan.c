@@ -135,3 +135,23 @@ char *scan(FILE *stream) {
     buffer[0] = 0;
     return buffer;
 }
+
+void *parse_declaration(FILE *stream) {
+    void *declaration_specifier
+}
+
+void *parse_compound_stmt(FILE *stream) {
+    char *token = scan(stream);
+    if (!strcmp(token, "{")) {
+        while (1) {
+            token = scan(stream);
+            if (!strcmp(token, "}"))
+                return COMPOUND_STMT(stmt_list);
+            unscan(token, stream);
+            if (is_sto_class_spe(token) || is_type_spe(token) || is_type_qua(token))
+                list_append(stmt_list, parse_declaration(stream));
+            else
+                list_append(stmt_list, parse_stmt(stream));
+        }
+    }
+}
