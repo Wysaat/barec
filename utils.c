@@ -1,6 +1,4 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include "barec.h"
 
 void unscan(char *token, FILE *stream) {
     char *ptr = token;
@@ -25,7 +23,7 @@ void emitln(char *words) {
     fclose(stream);
 }
 
-int is_identifier(char *token) {
+int is_id(char *token) {
     return (*token == '_' || (*token >= 'a' && *token <= 'z') || (*token >= 'A' && *token <= 'Z'));
 }
 
