@@ -31,6 +31,15 @@ typedef struct declaration {
     list *init_declarator_list;
 } declaration;
 
+typedef struct int_expr {
+    char *value;
+} int_expr;
+
+typedef struct compound_stmt {
+    int type;
+    list *stmt_list;
+} compound_stmt;
+
 char *scan(FILE *stream);
 
 void *pare_declaration_specifier(FILE *stream);

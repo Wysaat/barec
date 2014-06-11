@@ -27,14 +27,14 @@ int is_id(char *token) {
     return (*token == '_' || (*token >= 'a' && *token <= 'z') || (*token >= 'A' && *token <= 'Z'));
 }
 
-int is_integer_const(char *token) {
+int is_int(char *token) {
     while (*token)
         if (!(*token >= '0' && *token++ <= '9'))
             return 0;
     return 1;
 }
 
-int is_character_const(char *token) {
+int is_char(char *token) {
 	return (*token == '\'');
 }
 
@@ -57,4 +57,21 @@ char *itoa(int value) {
         value = value / 10;
     }
     return retptr;
+}
+
+int is_sto_class_spe(char *token) {
+    return (!strcmp(token, "auto") || !strcmp(token, "register") || !strcmp(token, "static")
+                || !strcmp(token, "extern") || !strcmp(token, "typedef"));
+}
+
+int is_type_spe(char *token) {
+    if (!strcmp(token, "void") || !strcmp(token, "char") || !strcmp(token, "short") || !strcmp(token, "int")
+                || !strcmp(token, "long") || !strcmp(token, "float") || !strcmp(token, "double") || !strcmp(token, "signed")
+                    || !strcmp(token, "unsigned"))
+        return 1;
+    return 0;
+}
+
+int is_type_qua(char *token) {
+    return (!strcmp(token, "const") || !strcmp(token, "volatile"));
 }

@@ -18,3 +18,12 @@ void list_append(list *head, void *content) {
         ptr->next = node;
     }
 }
+
+typedef struct buffer {
+    char *content;
+    buffer *prev;
+    buffer *next;
+} buffer;
+
+buffer *buff_init();
+void buff_add(buffer *buff, char *string);

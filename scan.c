@@ -1,9 +1,4 @@
 #include "barec.h"
-// #include <stdio.h>
-// #include <stdlib.h>
-// #include <string.h>
-// #include "scan.h"
-// #include "list.h"
 
 char *scan(FILE *stream) {
     char *buffer = (char *)malloc(1024);
@@ -257,40 +252,72 @@ void *parse_declaration(FILE *stream) {
         return declaration_init(declaration_specifier, init_declarator_list);
 }
 
-
-void *parse_assignment(FILE *stream) {
+void *parse_pirmary_expr(FILE *stream) {
+    char *token = scan(stream);
+    if (is_id(token)) {
+        identifier *retptr = (identifier *)malloc(sizeof(identifier));
+        retptr->value = token;
+        return retptr;
+    }
+    if (is_int(token)) {
+        int_expr *retptr = (int_expr *)malloc(sizeof(int_expr));
+        retptr->value = token;
+        return retptr;
+    }
 }
 
-// void *parse_expr_stmt(FILE *stream) {
-//     char *token = scan(stream);
-//     if (!strcmp(token, ";"))
-//         return 0;
-//     else {
-//         unscan(token, stream);
-//         void *retptr = pare_expression(stream);
-//         token = scan(stream);
-//         if (!strcmp(token, ";"))
-//             return retptr;
-//     }
-// }
+void *parse_conditional_expression(FILE *stream) {
+    return parse_primary_expr(stream);
+}
+
+void *parse_assignment(FILE *stream) {
+    void expr =  parse_conditional_expression(stream);
+    char *token = scan(stream);
+    if (!strcmp(token, "=")) {
+        void *retptr = (assignment *)malloc(sizeof(assignment));
+        retptr->type = assignment_t;
+        retptr->expr1 = expr;
+        retptr->expr2 = parse_assignment_expression(stream);
+        return retptr;
+    }
+    else {
+        unscan(token, stream);
+        return expr;
+    }
+}
+
+void *parse_expression(FILE *stream) {
+    return parse_assignment(stream);
+}
 
 void *parse_stmt(FILE *stream) {
-    parse_expr_stmt(stream);
+    void *retptr = parse_expression(stream);
+    char *token = scan(stream);
+    if (!strcmp(token, ";"))
+        return retptr;
 }
 
 void *parse_compound_stmt(FILE *stream) {
     char *token = scan(stream);
+    compound_stmt *retptr = (compound_stmt *)malloc(sizeof(compound_stmt));
+    retptr->stmt_list = list_node();
     if (!strcmp(token, "{")) {
-        list *stmt_list = list_node();
         while (1) {
             token = scan(stream);
             if (!strcmp(token, "}"))
-                return compund_stmt_init(stmt_list);
+                return retptr;
             unscan(token, stream);
             if (is_sto_class_spe(token) || is_type_spe(token) || is_type_qua(token))
-                list_append(stmt_list, parse_declaration(stream));
+                list_append(retptr->stmt_list, parse_declaration(stream));
             else
-                list_append(stmt_list, parse_stmt(stream));
+                list_append(retptr->stmt_list, parse_stmt(stream));
         }
     }
+}
+
+int main()
+{
+    FILE *in = fopen("others/test.c", "r");
+    FILE *out = fopen("out", "w");
+    parse_stmt(in);
 }
