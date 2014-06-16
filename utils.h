@@ -8,8 +8,8 @@ int is_id(char *token);
 int is_int(char *token);
 int is_char(char *token);
 char *itoa(int value);
-int is_sto_class_spe(char *token);
-int is_type_spe(char *token);
-int is_type_qua(char *token);
+int is_storage(char *token);
+int is_type(char *token);
+int is_qualifier(char *token);
 
 #endif /* UTILS_H */

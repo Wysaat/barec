@@ -130,84 +130,51 @@ char *scan(FILE *stream) {
     return buffer;
 }
 
-void *parse_declaration_specifier(FILE *stream) {
-    int storage_class;
-    int type_qualifier = 0;
-    void *type_specifier = 0;
+void *parse_specifier(FILE *stream) {
     char *token;
+    int storage, size, stype, sign = 0;
     while (1) {
         token = scan(stream);
         if (!strcmp(token, "auto"))
-            storage_class = 1;
-        else if (!strcmp(token, "register"))
-            storage_class = 2;
-        else if (!strcmp(token, "static"))
-            storage_class = 3;
-        else if (!strcmp(token, "extern"))
-            storage_class = 4;
-        else if (!strcmp(token, "const"))
-            type_qualifier |= 0b01;
-        else if (!strcmp(token, "volatile"))
-            type_qualifier |= 0b10;
-        else if (!strcmp(token, "unsigned"))
-            ;
-        else if (!strcmp(token, "signed")) {
-            if (type_specifier)
-                ((integral_type_specifier *)type_specifier)->sign = 1;
-            else {
-                type_specifier = integral_type_specifier_init();
-                ((integral_type_specifier *)type_specifier)->sign = 1;
-            }
-        }
+            storage = 1;
         else if (!strcmp(token, "char")) {
-            if (type_specifier)
-                ((integral_type_specifier *)type_specifier)->size = 8;
-            else {
-                type_specifier = integral_type_specifier_init();
-                ((integral_type_specifier *)type_specifier)->size = 8;
-            }
-        }
-        else if (!strcmp(token, "short")) {
-            if (type_specifier)
-                ((integral_type_specifier *)type_specifier)->size = 16;
-            else {
-                type_specifier = integral_type_specifier_init();
-                ((integral_type_specifier *)type_specifier)->size = 8;
-            }
+            stype = 0; // int_specifier
+            size = 1;
         }
         else if (!strcmp(token, "int")) {
-            if (type_specifier)
-                if (!((integral_type_specifier *)type_specifier)->size)
-                    ((integral_type_specifier *)type_specifier)->size = 32;
-            else {
-                type_specifier = integral_type_specifier_init();
-                ((integral_type_specifier *)type_specifier)->size = 8;
-            }
+            stype = 0; // int_specifier
+            size = 4;
         }
-        else if (!strcmp(token, "long")) {
-            if (type_specifier)
-                ((integral_type_specifier *)type_specifier)->size = 64;
-            else {
-                type_specifier = integral_type_specifier_init();
-                ((integral_type_specifier *)type_specifier)->size = 8;
-            }
+        else if (!strcmp(token, "unsigned")) {
+            stype = 0;
+            sign = 1;
+        }
+        else if (!strcmp(token, "signed")) {
+            stype = 0;
+            sign = 1;
         }
         else {
             unscan(token, stream);
-            return declaration_specifier_init(storage_class, type_qualifier, type_specifier);
+            break;
         }
+    }
+    if (stype == 0) {
+        int_specifier *specifier = (int_specifier *)malloc(sizeof(int_specifier));
+        specifier->type = int_specifier_t;
+        specifier->storage = storage;
+        specifier->sign = sign;
+        specifier->size = size;
+        return specifier;
     }
 }
 
-void *parse_init_declarator(FILE *stream) {
-    init_declarator *retptr = (init_declarator *)malloc(sizeof(init_declarator));
-    retptr->declarator = (declarator *)malloc(sizeof(declarator));
-    retptr->declarator->pointers = 0;
+void *parse_declarator(FILE *stream) {
     char *token;
+    int pointers;
     while (1) {
         token = scan(stream);
         if (!strcmp(token, "*"))
-            retptr->declarator->pointers++;
+            pointers++;
         else {
             unscan(token, stream);
             break;
@@ -215,41 +182,30 @@ void *parse_init_declarator(FILE *stream) {
     }
     token = scan(stream);
     if (is_id(token)) {
-        retptr->declarator->id = token;
-        token = scan(stream);
-        if (!strcmp(token, "="))
-            retptr->initializer = parse_assignment(stream);
-        else {
-            unscan(token, stream);
-            retptr->initializer = 0;
-        }
+        declarator *retptr = (declarator *)malloc(sizeof(declarator));
+        retptr->pointers = pointers;
+        retptr->id = token;
         return retptr;
     }
 }
 
-list *parse_init_declarator_list(FILE *stream) {
-    list *init_declarator_list = list_node();
+list *parse_declaration(FILE *stream) {
+    void *specifier = parse_specifier(stream);
+    declarator *dptr;
     char *token;
+    list *assignments = list_node();
     while (1) {
-        list_append(init_declarator_list, parse_init_declarator(stream));
+        dptr = parse_declarator(stream);
+        if (dptr->pointers)
+            stack_pointer += 4;
+        else {
+            if (type(specifier) == int_specifier_t)
+                stack_pointer += ((int_specifier *)specifier)->size;
+        }
         token = scan(stream);
-        if (!strcmp(token, ";")) {
-            unscan(token, stream);
-            return init_declarator_list;
+        if (!strcmp(token, "=")) {
         }
     }
-}
-
-void *parse_declaration(FILE *stream) {
-    void *declaration_specifier = parse_declaration_specifier(stream);
-    char *token = scan(stream);
-    if (!strcmp(token, ";"))
-        return declaration_init(declaration_specifier, 0);
-    unscan(token, stream);
-    list *init_declarator_list = parse_init_declarator_list(stream);
-    token = scan(stream);
-    if (!strcmp(token, ";"))
-        return declaration_init(declaration_specifier, init_declarator_list);
 }
 
 void *parse_pirmary_expr(FILE *stream) {
@@ -307,7 +263,7 @@ void *parse_compound_stmt(FILE *stream) {
             if (!strcmp(token, "}"))
                 return retptr;
             unscan(token, stream);
-            if (is_sto_class_spe(token) || is_type_spe(token) || is_type_qua(token))
+            if (is_storage(token) || is_type(token) || is_qualifier(token))
                 list_append(retptr->stmt_list, parse_declaration(stream));
             else
                 list_append(retptr->stmt_list, parse_stmt(stream));
@@ -317,7 +273,5 @@ void *parse_compound_stmt(FILE *stream) {
 
 int main()
 {
-    FILE *in = fopen("others/test.c", "r");
-    FILE *out = fopen("out", "w");
-    parse_stmt(in);
+    return 0;
 }

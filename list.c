@@ -19,11 +19,30 @@ void list_append(list *head, void *content) {
     }
 }
 
-typedef struct buffer {
-    char *content;
-    buffer *prev;
-    buffer *next;
-} buffer;
+buffer *buff_init() {
+    buffer *retptr = (buffer *)calloc(sizeof(buffer));
+    return retptr;
+}
 
-buffer *buff_init();
-void buff_add(buffer *buff, char *string);
+// add to the head
+void buff_add(buffer *buff, char *string) {
+    buff->prev = buff_init();
+    buff->prev->next = buff;
+    buff->prev->content = strdup(string);
+}
+
+char *buff_puts(buffer *buff) {
+    buffer *ptr = buff;
+    int len = 0, offs = 0;
+    while (ptr->next) {
+        len += strlen(ptr->content);
+        ptr = ptr->next;
+    }
+    char *retptr = (char *)malloc(len+1);
+    for ( ; ptr->prev; ptr = ptr->prev) {
+        strcpy(retptr+offs, ptr->content);
+        offs += strlen(ptr->content);
+    }
+    retptr[len] = 0;
+    return retptr;
+}

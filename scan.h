@@ -3,17 +3,15 @@
 
 #include "barec.h"
 
-typedef struct integral_type_specifier {
+int stack_pointer;
+
+typedef struct int_specifier {
     int type;
+    int storage;  // storage classs
+    // int qualifier; // type qualifier
     int sign;
     int size;
-} integral_type_specifier;
-
-typedef struct declaration_specifier {
-    int storage_class;
-    int type_qualifier;
-    void *type_specifier;
-} declaration_specifier;
+} int_specifier;  // integral declaration specifier
 
 typedef struct declarator {
     int pointers;
@@ -22,12 +20,11 @@ typedef struct declarator {
 
 typedef struct init_declarator {
     declarator *declarator;
-    void *initializer;
+    void *initializer;  // can be 0
 } init_declarator;
 
 typedef struct declaration {
-    int type;
-    declaration_specifier *dec_spec;
+    void *specifier;
     list *init_declarator_list;
 } declaration;
 
@@ -42,12 +39,10 @@ typedef struct compound_stmt {
 
 char *scan(FILE *stream);
 
-void *pare_declaration_specifier(FILE *stream);
-void *pare_declaration(FILE *stream);
+void *parse_specifierr(FILE *stream);
+void *parse_declarator(FILE *stream);
+void *parse_declaration(FILE *stream);
 void *parse_compound_stmt(FILE *stream);
-declaration_specifier *declaration_specifier_init(int storage_class, int type_qualifier, void *type_specifier);
-integral_type_specifier *integral_type_specifier_init();
-declaration *declaration_init(declaration_specifier *, list *);
 
 void *parse_assignment(FILE *stream);
 

@@ -59,12 +59,12 @@ char *itoa(int value) {
     return retptr;
 }
 
-int is_sto_class_spe(char *token) {
+int is_storage(char *token) {
     return (!strcmp(token, "auto") || !strcmp(token, "register") || !strcmp(token, "static")
                 || !strcmp(token, "extern") || !strcmp(token, "typedef"));
 }
 
-int is_type_spe(char *token) {
+int is_type(char *token) {
     if (!strcmp(token, "void") || !strcmp(token, "char") || !strcmp(token, "short") || !strcmp(token, "int")
                 || !strcmp(token, "long") || !strcmp(token, "float") || !strcmp(token, "double") || !strcmp(token, "signed")
                     || !strcmp(token, "unsigned"))
@@ -72,6 +72,6 @@ int is_type_spe(char *token) {
     return 0;
 }
 
-int is_type_qua(char *token) {
+int is_qualifier(char *token) {
     return (!strcmp(token, "const") || !strcmp(token, "volatile"));
 }

@@ -12,7 +12,16 @@ struct list {
 	list *next;
 };
 
+typedef struct buffer {
+    char *content;
+    buffer *prev;
+    buffer *next;
+} buffer;
+
 list *list_node();
 void list_append(list *, void *);
+buffer *buff_init();
+void buff_add(buffer *buff, char *string);
+char *buff_puts(buffer *buff);
 
 #endif /* LIST_H */
