@@ -4,3 +4,4 @@
 #include "scan.h"
 #include "list.h"
 #include "utils.h"
+#include "types.h"

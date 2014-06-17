@@ -4,6 +4,7 @@
 #include "barec.h"
 
 int stack_pointer;
+list *declarations;
 
 typedef struct int_specifier {
     int type;
@@ -28,22 +29,25 @@ typedef struct declaration {
     list *init_declarator_list;
 } declaration;
 
-typedef struct int_expr {
-    char *value;
-} int_expr;
-
-typedef struct compound_stmt {
+typedef struct integer {
     int type;
-    list *stmt_list;
-} compound_stmt;
+    char *value;
+} integer;
+
+typedef struct declaration_node {
+    int pointers;
+    char *id;
+    void *specifier;
+} declaration_node;
 
 char *scan(FILE *stream);
 
 void *parse_specifierr(FILE *stream);
-void *parse_declarator(FILE *stream);
-void *parse_declaration(FILE *stream);
-void *parse_compound_stmt(FILE *stream);
-
+declarator *parse_declarator(FILE *stream);
+list *parse_declaration(FILE *stream);
+void *parse_primary(FILE *stream);
 void *parse_assignment(FILE *stream);
+
+int type(void *);
 
 #endif /* SCAN_H */

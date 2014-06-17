@@ -168,7 +168,7 @@ void *parse_specifier(FILE *stream) {
     }
 }
 
-void *parse_declarator(FILE *stream) {
+declarator *parse_declarator(FILE *stream) {
     char *token;
     int pointers;
     while (1) {
@@ -193,9 +193,14 @@ list *parse_declaration(FILE *stream) {
     void *specifier = parse_specifier(stream);
     declarator *dptr;
     char *token;
-    list *assignments = list_node();
+    list *assignment_list = list_node();
     while (1) {
         dptr = parse_declarator(stream);
+        declaration_node *node = (declaration_node *)malloc(sizeof(declaration_node));
+        node->pointers = dptr->pointers;
+        node->id = dptr->id;
+        node->specifier = specifier;
+        list_append(declarations, node);
         if (dptr->pointers)
             stack_pointer += 4;
         else {
@@ -204,71 +209,33 @@ list *parse_declaration(FILE *stream) {
         }
         token = scan(stream);
         if (!strcmp(token, "=")) {
+            unscan(token, stream);
+            unscan(dptr->id, stream);
+            list_append(assignment_list, parse_assignment(stream));
+            token = scan(stream);
+            if (strcmp(token, ",")) {
+                unscan(token, stream);
+                return assignment_list;
+            }
+        }
+        else if (strcmp(token, ",")) {
+            unscan(token, stream);
+            return assignment_list;
         }
     }
 }
 
-void *parse_pirmary_expr(FILE *stream) {
+void *parse_primary(FILE *stream) {
     char *token = scan(stream);
-    if (is_id(token)) {
-        identifier *retptr = (identifier *)malloc(sizeof(identifier));
-        retptr->value = token;
-        return retptr;
-    }
     if (is_int(token)) {
-        int_expr *retptr = (int_expr *)malloc(sizeof(int_expr));
+        integer *retptr = (integer *)malloc(sizeof(integer));
+        retptr->type = integer_t;
         retptr->value = token;
         return retptr;
     }
-}
-
-void *parse_conditional_expression(FILE *stream) {
-    return parse_primary_expr(stream);
 }
 
 void *parse_assignment(FILE *stream) {
-    void expr =  parse_conditional_expression(stream);
-    char *token = scan(stream);
-    if (!strcmp(token, "=")) {
-        void *retptr = (assignment *)malloc(sizeof(assignment));
-        retptr->type = assignment_t;
-        retptr->expr1 = expr;
-        retptr->expr2 = parse_assignment_expression(stream);
-        return retptr;
-    }
-    else {
-        unscan(token, stream);
-        return expr;
-    }
-}
-
-void *parse_expression(FILE *stream) {
-    return parse_assignment(stream);
-}
-
-void *parse_stmt(FILE *stream) {
-    void *retptr = parse_expression(stream);
-    char *token = scan(stream);
-    if (!strcmp(token, ";"))
-        return retptr;
-}
-
-void *parse_compound_stmt(FILE *stream) {
-    char *token = scan(stream);
-    compound_stmt *retptr = (compound_stmt *)malloc(sizeof(compound_stmt));
-    retptr->stmt_list = list_node();
-    if (!strcmp(token, "{")) {
-        while (1) {
-            token = scan(stream);
-            if (!strcmp(token, "}"))
-                return retptr;
-            unscan(token, stream);
-            if (is_storage(token) || is_type(token) || is_qualifier(token))
-                list_append(retptr->stmt_list, parse_declaration(stream));
-            else
-                list_append(retptr->stmt_list, parse_stmt(stream));
-        }
-    }
 }
 
 int main()

@@ -20,7 +20,8 @@ void list_append(list *head, void *content) {
 }
 
 buffer *buff_init() {
-    buffer *retptr = (buffer *)calloc(sizeof(buffer));
+    buffer *retptr = (buffer *)malloc(sizeof(buffer));
+    retptr->next = 0;
     return retptr;
 }
 
@@ -29,6 +30,15 @@ void buff_add(buffer *buff, char *string) {
     buff->prev = buff_init();
     buff->prev->next = buff;
     buff->prev->content = strdup(string);
+}
+
+void buff_addln(buffer *buff, char *string) {
+    int len = strlen(string);
+    char new_string[len+2];
+    strcpy(new_string, string);
+    new_string[len] = '\n';
+    new_string[len+1] = 0;
+    buff_add(buff, new_string);
 }
 
 char *buff_puts(buffer *buff) {

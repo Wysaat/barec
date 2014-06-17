@@ -4,6 +4,7 @@
 #include "barec.h"
 
 typedef struct list list;
+typedef struct buffer buffer;
 
 /* the list has an empty head */
 struct list {
@@ -22,6 +23,7 @@ list *list_node();
 void list_append(list *, void *);
 buffer *buff_init();
 void buff_add(buffer *buff, char *string);
+void buff_addln(buffer *buff, char *string);
 char *buff_puts(buffer *buff);
 
 #endif /* LIST_H */
