@@ -1,0 +1,10 @@
+void assignmentGenCode(void *vptr, buffer *buff);
+void expression_stmtGenCode(void *vptr, buffer *buff);
+char *integer_get_value(void *vptr);
+char *identifier_get_value(void *vptr);
+char *identifier_get_addr(void *vptr);
+void integerGenCode(void *vptr, buffer *buff);
+void identifierGenCode(void *vptr, buffer *buff);
+void genCode(void *ptr, buffer *buff);
+char *get_addr(void *expr);
+char *get_value(void *expr);

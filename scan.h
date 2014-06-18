@@ -35,10 +35,22 @@ typedef struct integer {
 } integer;
 
 typedef struct declaration_node {
+    int type;
     int pointers;
     char *id;
     void *specifier;
 } declaration_node;
+
+typedef struct assignment {
+    int type;
+    void *expr1;
+    void *expr2;
+} assignment;
+
+typedef struct expression_stmt {
+    int type;
+    list *assignment_list;
+} expression_stmt;
 
 char *scan(FILE *stream);
 

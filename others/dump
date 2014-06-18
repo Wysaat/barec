@@ -45,8 +45,8 @@ Disassembly of section .text:
  80482f8:	50                   	push   %eax
  80482f9:	54                   	push   %esp
  80482fa:	52                   	push   %edx
- 80482fb:	68 a0 84 04 08       	push   $0x80484a0
- 8048300:	68 30 84 04 08       	push   $0x8048430
+ 80482fb:	68 b0 84 04 08       	push   $0x80484b0
+ 8048300:	68 40 84 04 08       	push   $0x8048440
  8048305:	51                   	push   %ecx
  8048306:	56                   	push   %esi
  8048307:	68 19 84 04 08       	push   $0x8048419
@@ -165,71 +165,77 @@ Disassembly of section .text:
  8048419:	55                   	push   %ebp
  804841a:	89 e5                	mov    %esp,%ebp
  804841c:	83 ec 10             	sub    $0x10,%esp
- 804841f:	c7 45 fc 01 00 00 00 	movl   $0x1,-0x4(%ebp)
- 8048426:	b8 00 00 00 00       	mov    $0x0,%eax
- 804842b:	c9                   	leave  
- 804842c:	c3                   	ret    
- 804842d:	66 90                	xchg   %ax,%ax
- 804842f:	90                   	nop
+ 804841f:	c7 45 fc 03 00 00 00 	movl   $0x3,-0x4(%ebp)
+ 8048426:	8b 45 fc             	mov    -0x4(%ebp),%eax
+ 8048429:	83 e8 10             	sub    $0x10,%eax
+ 804842c:	89 45 fc             	mov    %eax,-0x4(%ebp)
+ 804842f:	b8 00 00 00 00       	mov    $0x0,%eax
+ 8048434:	c9                   	leave  
+ 8048435:	c3                   	ret    
+ 8048436:	66 90                	xchg   %ax,%ax
+ 8048438:	66 90                	xchg   %ax,%ax
+ 804843a:	66 90                	xchg   %ax,%ax
+ 804843c:	66 90                	xchg   %ax,%ax
+ 804843e:	66 90                	xchg   %ax,%ax
 
-08048430 <__libc_csu_init>:
- 8048430:	55                   	push   %ebp
- 8048431:	57                   	push   %edi
- 8048432:	31 ff                	xor    %edi,%edi
- 8048434:	56                   	push   %esi
- 8048435:	53                   	push   %ebx
- 8048436:	e8 e5 fe ff ff       	call   8048320 <__x86.get_pc_thunk.bx>
- 804843b:	81 c3 c5 1b 00 00    	add    $0x1bc5,%ebx
- 8048441:	83 ec 1c             	sub    $0x1c,%esp
- 8048444:	8b 6c 24 30          	mov    0x30(%esp),%ebp
- 8048448:	8d b3 0c ff ff ff    	lea    -0xf4(%ebx),%esi
- 804844e:	e8 41 fe ff ff       	call   8048294 <_init>
- 8048453:	8d 83 08 ff ff ff    	lea    -0xf8(%ebx),%eax
- 8048459:	29 c6                	sub    %eax,%esi
- 804845b:	c1 fe 02             	sar    $0x2,%esi
- 804845e:	85 f6                	test   %esi,%esi
- 8048460:	74 27                	je     8048489 <__libc_csu_init+0x59>
- 8048462:	8d b6 00 00 00 00    	lea    0x0(%esi),%esi
- 8048468:	8b 44 24 38          	mov    0x38(%esp),%eax
- 804846c:	89 2c 24             	mov    %ebp,(%esp)
- 804846f:	89 44 24 08          	mov    %eax,0x8(%esp)
- 8048473:	8b 44 24 34          	mov    0x34(%esp),%eax
- 8048477:	89 44 24 04          	mov    %eax,0x4(%esp)
- 804847b:	ff 94 bb 08 ff ff ff 	call   *-0xf8(%ebx,%edi,4)
- 8048482:	83 c7 01             	add    $0x1,%edi
- 8048485:	39 f7                	cmp    %esi,%edi
- 8048487:	75 df                	jne    8048468 <__libc_csu_init+0x38>
- 8048489:	83 c4 1c             	add    $0x1c,%esp
- 804848c:	5b                   	pop    %ebx
- 804848d:	5e                   	pop    %esi
- 804848e:	5f                   	pop    %edi
- 804848f:	5d                   	pop    %ebp
- 8048490:	c3                   	ret    
- 8048491:	eb 0d                	jmp    80484a0 <__libc_csu_fini>
- 8048493:	90                   	nop
- 8048494:	90                   	nop
- 8048495:	90                   	nop
- 8048496:	90                   	nop
- 8048497:	90                   	nop
- 8048498:	90                   	nop
- 8048499:	90                   	nop
- 804849a:	90                   	nop
- 804849b:	90                   	nop
- 804849c:	90                   	nop
- 804849d:	90                   	nop
- 804849e:	90                   	nop
- 804849f:	90                   	nop
+08048440 <__libc_csu_init>:
+ 8048440:	55                   	push   %ebp
+ 8048441:	57                   	push   %edi
+ 8048442:	31 ff                	xor    %edi,%edi
+ 8048444:	56                   	push   %esi
+ 8048445:	53                   	push   %ebx
+ 8048446:	e8 d5 fe ff ff       	call   8048320 <__x86.get_pc_thunk.bx>
+ 804844b:	81 c3 b5 1b 00 00    	add    $0x1bb5,%ebx
+ 8048451:	83 ec 1c             	sub    $0x1c,%esp
+ 8048454:	8b 6c 24 30          	mov    0x30(%esp),%ebp
+ 8048458:	8d b3 0c ff ff ff    	lea    -0xf4(%ebx),%esi
+ 804845e:	e8 31 fe ff ff       	call   8048294 <_init>
+ 8048463:	8d 83 08 ff ff ff    	lea    -0xf8(%ebx),%eax
+ 8048469:	29 c6                	sub    %eax,%esi
+ 804846b:	c1 fe 02             	sar    $0x2,%esi
+ 804846e:	85 f6                	test   %esi,%esi
+ 8048470:	74 27                	je     8048499 <__libc_csu_init+0x59>
+ 8048472:	8d b6 00 00 00 00    	lea    0x0(%esi),%esi
+ 8048478:	8b 44 24 38          	mov    0x38(%esp),%eax
+ 804847c:	89 2c 24             	mov    %ebp,(%esp)
+ 804847f:	89 44 24 08          	mov    %eax,0x8(%esp)
+ 8048483:	8b 44 24 34          	mov    0x34(%esp),%eax
+ 8048487:	89 44 24 04          	mov    %eax,0x4(%esp)
+ 804848b:	ff 94 bb 08 ff ff ff 	call   *-0xf8(%ebx,%edi,4)
+ 8048492:	83 c7 01             	add    $0x1,%edi
+ 8048495:	39 f7                	cmp    %esi,%edi
+ 8048497:	75 df                	jne    8048478 <__libc_csu_init+0x38>
+ 8048499:	83 c4 1c             	add    $0x1c,%esp
+ 804849c:	5b                   	pop    %ebx
+ 804849d:	5e                   	pop    %esi
+ 804849e:	5f                   	pop    %edi
+ 804849f:	5d                   	pop    %ebp
+ 80484a0:	c3                   	ret    
+ 80484a1:	eb 0d                	jmp    80484b0 <__libc_csu_fini>
+ 80484a3:	90                   	nop
+ 80484a4:	90                   	nop
+ 80484a5:	90                   	nop
+ 80484a6:	90                   	nop
+ 80484a7:	90                   	nop
+ 80484a8:	90                   	nop
+ 80484a9:	90                   	nop
+ 80484aa:	90                   	nop
+ 80484ab:	90                   	nop
+ 80484ac:	90                   	nop
+ 80484ad:	90                   	nop
+ 80484ae:	90                   	nop
+ 80484af:	90                   	nop
 
-080484a0 <__libc_csu_fini>:
- 80484a0:	f3 c3                	repz ret 
+080484b0 <__libc_csu_fini>:
+ 80484b0:	f3 c3                	repz ret 
 
 Disassembly of section .fini:
 
-080484a4 <_fini>:
- 80484a4:	53                   	push   %ebx
- 80484a5:	83 ec 08             	sub    $0x8,%esp
- 80484a8:	e8 73 fe ff ff       	call   8048320 <__x86.get_pc_thunk.bx>
- 80484ad:	81 c3 53 1b 00 00    	add    $0x1b53,%ebx
- 80484b3:	83 c4 08             	add    $0x8,%esp
- 80484b6:	5b                   	pop    %ebx
- 80484b7:	c3                   	ret    
+080484b4 <_fini>:
+ 80484b4:	53                   	push   %ebx
+ 80484b5:	83 ec 08             	sub    $0x8,%esp
+ 80484b8:	e8 63 fe ff ff       	call   8048320 <__x86.get_pc_thunk.bx>
+ 80484bd:	81 c3 43 1b 00 00    	add    $0x1b43,%ebx
+ 80484c3:	83 c4 08             	add    $0x8,%esp
+ 80484c6:	5b                   	pop    %ebx
+ 80484c7:	c3                   	ret    

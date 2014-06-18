@@ -213,15 +213,11 @@ list *parse_declaration(FILE *stream) {
             unscan(dptr->id, stream);
             list_append(assignment_list, parse_assignment(stream));
             token = scan(stream);
-            if (strcmp(token, ",")) {
-                unscan(token, stream);
+            if (!strcmp(token, ";"))
                 return assignment_list;
-            }
         }
-        else if (strcmp(token, ",")) {
-            unscan(token, stream);
+        else if (!strcmp(token, ";"))
             return assignment_list;
-        }
     }
 }
 
@@ -233,12 +229,52 @@ void *parse_primary(FILE *stream) {
         retptr->value = token;
         return retptr;
     }
+    else if (is_id(token)) {
+        list *ptr;
+        for (ptr = declarations; ptr; ptr = ptr->next) {
+            declaration_node *node = (declaration_node *)ptr->content;
+            node->type = identifier_t;
+            if (!strcmp(node->id, token))
+                return node;
+        }
+    }
+}
+
+void *parse_conditional(FILE *stream) {
+    return parse_primary(stream);
 }
 
 void *parse_assignment(FILE *stream) {
+    void *expr = parse_conditional(stream);
+    char *token = scan(stream);
+    if (!strcmp(token, "=")) {
+        void *expr2 = parse_assignment(stream);
+        assignment *retptr = (assignment *)malloc(sizeof(assignment));
+        retptr->expr1 = expr;
+        retptr->expr2 = expr2;
+        return retptr;
+    }
 }
 
-int main()
+void *parse_expression_stmt(FILE *stream) {
+    list *assignment_list = list_node();
+    char *token;
+    while (1) {
+        list_append(assignment_list, parse_assignment);
+        token = scan(stream);
+        if (!strcmp(token, ";")) {
+            expression_stmt *retptr = (expression_stmt *)malloc(sizeof(expression_stmt));
+            retptr->type = expression_stmt_t;
+            retptr->assignment_list = assignment_list;
+            return retptr;
+        }
+    }
+}
+
+int main(int argc, char **argv)
 {
+    stack_pointer = 0;
+    declarations = list_node();
+    parse_declaration(stream);
     return 0;
 }
