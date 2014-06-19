@@ -189,11 +189,12 @@ declarator *parse_declarator(FILE *stream) {
     }
 }
 
-list *parse_declaration(FILE *stream) {
+expression_stmt *parse_declaration(FILE *stream) {
     void *specifier = parse_specifier(stream);
     declarator *dptr;
     char *token;
     list *assignment_list = list_node();
+    expression_stmt *retptr;
     while (1) {
         dptr = parse_declarator(stream);
         declaration_node *node = (declaration_node *)malloc(sizeof(declaration_node));
@@ -213,11 +214,19 @@ list *parse_declaration(FILE *stream) {
             unscan(dptr->id, stream);
             list_append(assignment_list, parse_assignment(stream));
             token = scan(stream);
-            if (!strcmp(token, ";"))
-                return assignment_list;
+            if (!strcmp(token, ";")) {
+                retptr = (expression_stmt *)malloc(sizeof(expression_stmt));
+                retptr->type = expression_stmt_t;
+                retptr->assignment_list = assignment_list;
+                return retptr;
+            }
         }
-        else if (!strcmp(token, ";"))
-            return assignment_list;
+        else if (!strcmp(token, ";")) {
+            retptr = (expression_stmt *)malloc(sizeof(expression_stmt));
+            retptr->type = expression_stmt_t;
+            retptr->assignment_list = assignment_list;
+            return retptr;
+        }
     }
 }
 
@@ -231,11 +240,12 @@ void *parse_primary(FILE *stream) {
     }
     else if (is_id(token)) {
         list *ptr;
-        for (ptr = declarations; ptr; ptr = ptr->next) {
+        for (ptr = declarations->next; ptr; ptr = ptr->next) {
             declaration_node *node = (declaration_node *)ptr->content;
-            node->type = identifier_t;
-            if (!strcmp(node->id, token))
+            if (!strcmp(node->id, token)) {
+                node->type = identifier_t;
                 return node;
+            }
         }
     }
 }
@@ -253,6 +263,10 @@ void *parse_assignment(FILE *stream) {
         retptr->expr1 = expr;
         retptr->expr2 = expr2;
         return retptr;
+    }
+    else {
+        unscan(token, stream);
+        return expr;
     }
 }
 
@@ -273,8 +287,24 @@ void *parse_expression_stmt(FILE *stream) {
 
 int main(int argc, char **argv)
 {
+    if (argc != 3) {
+        puts("<usage> ./scan infile outfile");
+        exit(0);
+    }
+    FILE *istream = fopen(argv[1], "r");
+    FILE *ostream = fopen(argv[2], "w");
+    char *code;
+    buffer *buff = buff_init();
     stack_pointer = 0;
     declarations = list_node();
-    parse_declaration(stream);
+    expression_stmt *stmt = parse_declaration(istream);
+    if (stmt) {
+        genCode(stmt, buff);
+        code = buff_puts(buff);
+        fwrite(code, 1, strlen(code), ostream);
+    }
+
+    fclose(istream);
+    fclose(ostream);
     return 0;
 }

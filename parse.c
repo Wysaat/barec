@@ -9,14 +9,14 @@ void assignmentGenCode(void *vptr, buffer *buff) {
     assignment *expr = (assignment *)vptr;
     buff_add(buff, "mov    ");
     buff_add(buff, get_addr(expr->expr1));
-    buff_add(buff, ",");
+    buff_add(buff, ", ");
     buff_addln(buff, get_value(expr->expr2));
 }
 
 void expression_stmtGenCode(void *vptr, buffer *buff) {
     expression_stmt *stmt = (expression_stmt *)vptr;
     list *ptr;
-    for (ptr = stmt->assignment_list; ptr; ptr = ptr->next)
+    for (ptr = stmt->assignment_list->next; ptr; ptr = ptr->next)
         assignmentGenCode(ptr->content, buff);
 }
 
@@ -74,8 +74,10 @@ void genCode(void *ptr, buffer *buff) {
             break;
         case integer_t:
             integerGenCode(ptr, buff);
+            break;
         case identifier_t:
             identifierGenCode(ptr, buff);
+            break;
     }
 }
 
@@ -90,7 +92,9 @@ char *get_value(void *expr) {
     switch (type(expr)) {
         case identifier_t:
             return identifier_get_value(expr);
+            break;
         case integer_t:
             return integer_get_value(expr);
+            break;
     }
 }

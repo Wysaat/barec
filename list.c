@@ -21,15 +21,18 @@ void list_append(list *head, void *content) {
 
 buffer *buff_init() {
     buffer *retptr = (buffer *)malloc(sizeof(buffer));
+    retptr->prev = 0;
     retptr->next = 0;
+    retptr->head = retptr;
     return retptr;
 }
 
-// add to the head
+// add to the head, empty tail
 void buff_add(buffer *buff, char *string) {
-    buff->prev = buff_init();
-    buff->prev->next = buff;
-    buff->prev->content = strdup(string);
+    buff->head->prev = buff_init();
+    buff->head->prev->next = buff->head;
+    buff->head->prev->content = strdup(string);
+    buff->head = buff->head->prev;
 }
 
 void buff_addln(buffer *buff, char *string) {
@@ -42,14 +45,16 @@ void buff_addln(buffer *buff, char *string) {
 }
 
 char *buff_puts(buffer *buff) {
-    buffer *ptr = buff;
+    buffer *ptr = buff->head;
     int len = 0, offs = 0;
+    if (!ptr->next)
+        return strdup("");
     while (ptr->next) {
         len += strlen(ptr->content);
         ptr = ptr->next;
     }
     char *retptr = (char *)malloc(len+1);
-    for ( ; ptr->prev; ptr = ptr->prev) {
+    for (ptr = buff->prev; ptr; ptr = ptr->prev) {
         strcpy(retptr+offs, ptr->content);
         offs += strlen(ptr->content);
     }

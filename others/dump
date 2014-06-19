@@ -71,8 +71,8 @@ Disassembly of section .text:
  804832e:	66 90                	xchg   %ax,%ax
 
 08048330 <deregister_tm_clones>:
- 8048330:	b8 1f a0 04 08       	mov    $0x804a01f,%eax
- 8048335:	2d 1c a0 04 08       	sub    $0x804a01c,%eax
+ 8048330:	b8 23 a0 04 08       	mov    $0x804a023,%eax
+ 8048335:	2d 20 a0 04 08       	sub    $0x804a020,%eax
  804833a:	83 f8 06             	cmp    $0x6,%eax
  804833d:	77 01                	ja     8048340 <deregister_tm_clones+0x10>
  804833f:	c3                   	ret    
@@ -82,15 +82,15 @@ Disassembly of section .text:
  8048349:	55                   	push   %ebp
  804834a:	89 e5                	mov    %esp,%ebp
  804834c:	83 ec 18             	sub    $0x18,%esp
- 804834f:	c7 04 24 1c a0 04 08 	movl   $0x804a01c,(%esp)
+ 804834f:	c7 04 24 20 a0 04 08 	movl   $0x804a020,(%esp)
  8048356:	ff d0                	call   *%eax
  8048358:	c9                   	leave  
  8048359:	c3                   	ret    
  804835a:	8d b6 00 00 00 00    	lea    0x0(%esi),%esi
 
 08048360 <register_tm_clones>:
- 8048360:	b8 1c a0 04 08       	mov    $0x804a01c,%eax
- 8048365:	2d 1c a0 04 08       	sub    $0x804a01c,%eax
+ 8048360:	b8 20 a0 04 08       	mov    $0x804a020,%eax
+ 8048365:	2d 20 a0 04 08       	sub    $0x804a020,%eax
  804836a:	c1 f8 02             	sar    $0x2,%eax
  804836d:	89 c2                	mov    %eax,%edx
  804836f:	c1 ea 1f             	shr    $0x1f,%edx
@@ -105,7 +105,7 @@ Disassembly of section .text:
  8048383:	89 e5                	mov    %esp,%ebp
  8048385:	83 ec 18             	sub    $0x18,%esp
  8048388:	89 44 24 04          	mov    %eax,0x4(%esp)
- 804838c:	c7 04 24 1c a0 04 08 	movl   $0x804a01c,(%esp)
+ 804838c:	c7 04 24 20 a0 04 08 	movl   $0x804a020,(%esp)
  8048393:	ff d2                	call   *%edx
  8048395:	c9                   	leave  
  8048396:	c3                   	ret    
@@ -113,13 +113,13 @@ Disassembly of section .text:
  8048399:	8d bc 27 00 00 00 00 	lea    0x0(%edi,%eiz,1),%edi
 
 080483a0 <__do_global_dtors_aux>:
- 80483a0:	80 3d 1c a0 04 08 00 	cmpb   $0x0,0x804a01c
+ 80483a0:	80 3d 20 a0 04 08 00 	cmpb   $0x0,0x804a020
  80483a7:	75 13                	jne    80483bc <__do_global_dtors_aux+0x1c>
  80483a9:	55                   	push   %ebp
  80483aa:	89 e5                	mov    %esp,%ebp
  80483ac:	83 ec 08             	sub    $0x8,%esp
  80483af:	e8 7c ff ff ff       	call   8048330 <deregister_tm_clones>
- 80483b4:	c6 05 1c a0 04 08 01 	movb   $0x1,0x804a01c
+ 80483b4:	c6 05 20 a0 04 08 01 	movb   $0x1,0x804a020
  80483bb:	c9                   	leave  
  80483bc:	f3 c3                	repz ret 
  80483be:	66 90                	xchg   %ax,%ax
@@ -164,19 +164,20 @@ Disassembly of section .text:
 08048419 <main>:
  8048419:	55                   	push   %ebp
  804841a:	89 e5                	mov    %esp,%ebp
- 804841c:	83 ec 10             	sub    $0x10,%esp
- 804841f:	c7 45 fc 03 00 00 00 	movl   $0x3,-0x4(%ebp)
- 8048426:	8b 45 fc             	mov    -0x4(%ebp),%eax
- 8048429:	83 e8 10             	sub    $0x10,%eax
- 804842c:	89 45 fc             	mov    %eax,-0x4(%ebp)
- 804842f:	b8 00 00 00 00       	mov    $0x0,%eax
- 8048434:	c9                   	leave  
- 8048435:	c3                   	ret    
- 8048436:	66 90                	xchg   %ax,%ax
- 8048438:	66 90                	xchg   %ax,%ax
- 804843a:	66 90                	xchg   %ax,%ax
- 804843c:	66 90                	xchg   %ax,%ax
- 804843e:	66 90                	xchg   %ax,%ax
+ 804841c:	a1 1c a0 04 08       	mov    0x804a01c,%eax
+ 8048421:	8d 50 04             	lea    0x4(%eax),%edx
+ 8048424:	89 15 1c a0 04 08    	mov    %edx,0x804a01c
+ 804842a:	8b 00                	mov    (%eax),%eax
+ 804842c:	8b 00                	mov    (%eax),%eax
+ 804842e:	b8 00 00 00 00       	mov    $0x0,%eax
+ 8048433:	5d                   	pop    %ebp
+ 8048434:	c3                   	ret    
+ 8048435:	66 90                	xchg   %ax,%ax
+ 8048437:	66 90                	xchg   %ax,%ax
+ 8048439:	66 90                	xchg   %ax,%ax
+ 804843b:	66 90                	xchg   %ax,%ax
+ 804843d:	66 90                	xchg   %ax,%ax
+ 804843f:	90                   	nop
 
 08048440 <__libc_csu_init>:
  8048440:	55                   	push   %ebp

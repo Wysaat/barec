@@ -17,6 +17,7 @@ typedef struct buffer {
     char *content;
     buffer *prev;
     buffer *next;
+    buffer *head;
 } buffer;
 
 list *list_node();

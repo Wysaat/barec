@@ -39,6 +39,7 @@ typedef struct declaration_node {
     int pointers;
     char *id;
     void *specifier;
+    int addr;
 } declaration_node;
 
 typedef struct assignment {
@@ -56,7 +57,7 @@ char *scan(FILE *stream);
 
 void *parse_specifierr(FILE *stream);
 declarator *parse_declarator(FILE *stream);
-list *parse_declaration(FILE *stream);
+expression_stmt *parse_declaration(FILE *stream);
 void *parse_primary(FILE *stream);
 void *parse_assignment(FILE *stream);
 
