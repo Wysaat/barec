@@ -7,10 +7,10 @@ int type(void *stmt) {
 
 void assignmentGenCode(void *vptr, buffer *buff) {
     assignment *expr = (assignment *)vptr;
-    buff_add(buff, "mov    ");
     buff_add(buff, get_addr(expr->expr1));
-    buff_add(buff, ", ");
-    buff_addln(buff, get_value(expr->expr2));
+    buff_addln(buff, "mov    ebx, eax");
+    buff_add(buff, get_value(expr->expr2));
+    buff_addln(buff, "mov    [ebx], eax");
 }
 
 void expression_stmtGenCode(void *vptr, buffer *buff) {
@@ -22,7 +22,10 @@ void expression_stmtGenCode(void *vptr, buffer *buff) {
 
 char *integer_get_value(void *vptr) {
     integer *expr = (integer *)vptr;
-    return expr->value;
+    buffer *buff = buff_init();
+    buff_add(buff, "mov    eax, ");
+    buff_addln(buff, expr->value);
+    return buff_puts(buff);
 }
 
 char *identifier_get_value(void *vptr) {
@@ -30,11 +33,12 @@ char *identifier_get_value(void *vptr) {
     buffer *buff = buff_init();
     if (type(node->specifier) == int_specifier_t) {
         int_specifier *specifier = (int_specifier *)node->specifier;
-        if (specifier->storage == 1) {  // auto
+        if (type(specifier->storage) == auto_storage_t) {
+            auto_storage *storage = (auto_storage *)specifier->storage;
+            buff_add(buff, "mov    eax, ");
             buff_add(buff, "[ebp-");
-            buff_add(buff, itoa(stack_pointer));
-            stack_pointer += specifier->size;
-            buff_add(buff, "]");
+            buff_add(buff, itoa(storage->stack_position));
+            buff_addln(buff, "]");
             return buff_puts(buff);
         }
     }
@@ -45,23 +49,53 @@ char *identifier_get_addr(void *vptr) {
     buffer *buff = buff_init();
     if (type(node->specifier) == int_specifier_t) {
         int_specifier *specifier = (int_specifier *)node->specifier;
-        if (specifier->storage == 1) {  // auto
+        if (type(specifier->storage) == auto_storage_t) {
+            auto_storage *storage = (auto_storage *)specifier->storage;
+            buff_add(buff, "mov    eax, ");
             buff_add(buff, "ebp-");
-            buff_add(buff, itoa(stack_pointer));
-            stack_pointer += specifier->size;
+            buff_addln(buff, itoa(storage->stack_position));
             return buff_puts(buff);
         }
     }
 }
 
+char *array_ref_get_addr(void *vptr) {
+    array_ref *expr = (array_ref *)vptr; 
+    buffer *buff = buff_init();
+    buff_add(buff, get_addr(expr->primary));
+    buff_addln(buff, "mov    eax, ebx");
+    buff_add(buff, get_value(expr->expr2));
+    buff_addln(buff, "add    eax, ebx");
+    return buff_puts(buff);
+}
+
+char *array_ref_get_value(void *vptr) {
+    array_ref *expr = (array_ref *)vptr;
+    buffer *buff = buff_init();
+    buff_add(buff, array_ref_get_addr(vptr));
+    buff_addln(buff, "mov    eax, [eax]");
+    return buff_puts(buff);
+}
+
+char *expression_get_value(void *vptr) {
+    expression *expr = (expression *)vptr;
+    buffer *buff = buff_init();
+    list *ptr;
+    for (ptr = expr->assignment_list->next; ptr; ptr = ptr->next)
+        buff_add(buff, get_value(ptr->content));
+    return buff_puts(buff);
+}
+
 void identifierGenCode(void *vptr, buffer *buff) {
-    buff_add(buff, "mov    eax, ");
-    buff_addln(buff, identifier_get_value(vptr));
+    buff_add(buff, identifier_get_value(vptr));
 }
 
 void integerGenCode(void *vptr, buffer *buff) {
-    buff_add(buff, "mov    eax, ");
-    buff_addln(buff, integer_get_value(vptr));
+    buff_add(buff, integer_get_value(vptr));
+}
+
+void array_refGenCode(void *vptr, buffer *buff) {
+    buff_add(buff, array_ref_get_value(vptr));
 }
 
 void genCode(void *ptr, buffer *buff) {
@@ -78,6 +112,9 @@ void genCode(void *ptr, buffer *buff) {
         case identifier_t:
             identifierGenCode(ptr, buff);
             break;
+        case array_ref_t:
+            array_refGenCode(ptr, buff);
+            break;
     }
 }
 
@@ -85,6 +122,8 @@ char *get_addr(void *expr) {
     switch (type(expr)) {
         case identifier_t:
             return identifier_get_addr(expr);
+        case array_ref_t:
+            return array_ref_get_addr(expr);
     }
 }
 
@@ -92,9 +131,11 @@ char *get_value(void *expr) {
     switch (type(expr)) {
         case identifier_t:
             return identifier_get_value(expr);
-            break;
         case integer_t:
             return integer_get_value(expr);
-            break;
+        case array_ref_t:
+            return array_ref_get_value(expr);
+        case expression_t:
+            return expression_get_value(expr);
     }
 }

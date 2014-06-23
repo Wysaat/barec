@@ -132,11 +132,15 @@ char *scan(FILE *stream) {
 
 void *parse_specifier(FILE *stream) {
     char *token;
-    int storage, size, stype, sign = 0;
+    void *storage;
+    int size, stype, sign = 0;
     while (1) {
         token = scan(stream);
-        if (!strcmp(token, "auto"))
-            storage = 1;
+        if (!strcmp(token, "auto")) {
+            storage = (auto_storage *)malloc(sizeof(auto_storage));
+            ((auto_storage *)storage)->type = auto_storage_t;
+            ((auto_storage *)storage)->stack_position = stack_pointer;
+        }
         else if (!strcmp(token, "char")) {
             stype = 0; // int_specifier
             size = 1;
@@ -250,8 +254,30 @@ void *parse_primary(FILE *stream) {
     }
 }
 
+void *parse_postfix(FILE *stream) {
+    void *primary = parse_primary(stream);
+    while (1) {
+        char *token = scan(stream);
+        if (!strcmp(token, "[")) {
+            void *expr2 = parse_expression(stream);
+            char *token = scan(stream);
+            if (!strcmp(token, "]")) {
+                array_ref *expr = (array_ref *)malloc(sizeof(array_ref));
+                expr->type = array_ref_t;
+                expr->primary = primary;
+                expr->expr2 = expr2;
+                primary = expr;
+            }
+        }
+        else {
+            unscan(token, stream);
+            return primary;
+        }
+    }
+}
+
 void *parse_conditional(FILE *stream) {
-    return parse_primary(stream);
+    return parse_postfix(stream);
 }
 
 void *parse_assignment(FILE *stream) {
@@ -270,11 +296,27 @@ void *parse_assignment(FILE *stream) {
     }
 }
 
+void *parse_expression(FILE *stream) {
+    list *assignment_list = list_node();
+    char *token;
+    while (1) {
+        list_append(assignment_list, parse_assignment(stream));
+        token = scan(stream);
+        if (strcmp(token, ",")) {
+            unscan(token, stream);
+            expression *retptr = (expression *)malloc(sizeof(expression));
+            retptr->type = expression_t;
+            retptr->assignment_list = assignment_list;
+            return retptr;
+        }
+    }
+}
+
 void *parse_expression_stmt(FILE *stream) {
     list *assignment_list = list_node();
     char *token;
     while (1) {
-        list_append(assignment_list, parse_assignment);
+        list_append(assignment_list, parse_assignment(stream));
         token = scan(stream);
         if (!strcmp(token, ";")) {
             expression_stmt *retptr = (expression_stmt *)malloc(sizeof(expression_stmt));
@@ -294,9 +336,9 @@ int main(int argc, char **argv)
     FILE *istream = fopen(argv[1], "r");
     FILE *ostream = fopen(argv[2], "w");
     char *code;
-    buffer *buff = buff_init();
-    stack_pointer = 0;
     declarations = list_node();
+
+    buffer *buff = buff_init();
     expression_stmt *stmt = parse_declaration(istream);
     if (stmt) {
         genCode(stmt, buff);
@@ -304,7 +346,16 @@ int main(int argc, char **argv)
         fwrite(code, 1, strlen(code), ostream);
     }
 
+    buffer *buff2 = buff_init();
+    stmt = parse_expression_stmt(istream);
+    if (stmt) {
+        genCode(stmt, buff2);
+        code = buff_puts(buff2);
+        fwrite(code, 1, strlen(code), ostream);
+    }
+
     fclose(istream);
     fclose(ostream);
+    printf("stack pointer is %d\n", stack_pointer);
     return 0;
 }

@@ -1,1 +1,2 @@
-auto int a = 3;
+auto char **b = 33;
+b[2] = 4;

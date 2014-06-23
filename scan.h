@@ -6,9 +6,14 @@
 int stack_pointer;
 list *declarations;
 
+typedef struct auto_storage {
+    int type;
+    int stack_position;
+} auto_storage;
+
 typedef struct int_specifier {
     int type;
-    int storage;  // storage classs
+    void *storage;  // storage class
     // int qualifier; // type qualifier
     int sign;
     int size;
@@ -34,6 +39,12 @@ typedef struct integer {
     char *value;
 } integer;
 
+typedef struct array_ref {
+    int type;
+    void *primary;
+    void *expr2;
+} array_ref;
+
 typedef struct declaration_node {
     int type;
     int pointers;
@@ -48,6 +59,11 @@ typedef struct assignment {
     void *expr2;
 } assignment;
 
+typedef struct expression {
+    int type;
+    list *assignment_list;
+} expression;
+
 typedef struct expression_stmt {
     int type;
     list *assignment_list;
@@ -60,6 +76,8 @@ declarator *parse_declarator(FILE *stream);
 expression_stmt *parse_declaration(FILE *stream);
 void *parse_primary(FILE *stream);
 void *parse_assignment(FILE *stream);
+void *parse_expression(FILE *stream);
+void *pares_expression_stmt(FILE *stream);
 
 int type(void *);
 

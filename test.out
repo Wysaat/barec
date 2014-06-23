@@ -1,1 +1,11 @@
-mov    ebp-4, 3
+mov    eax, ebp-0
+mov    ebx, eax
+mov    eax, 33
+mov    [ebx], eax
+mov    eax, ebp-0
+mov    eax, ebx
+mov    eax, 2
+add    eax, ebx
+mov    ebx, eax
+mov    eax, 4
+mov    [ebx], eax

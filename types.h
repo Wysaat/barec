@@ -6,7 +6,10 @@ enum types {
     integer_t = 1,
     expression_stmt_t = 2,
     assignment_t = 3,
-    identifier_t = 5,
+    identifier_t = 4,
+    auto_storage_t = 5,
+    expression_t = 6,
+    array_ref_t = 7,
 };
 
 #endif /* TYPES_H */
