@@ -45,6 +45,11 @@ typedef struct array_ref {
     void *expr2;
 } array_ref;
 
+typedef struct indirection {
+    int type;
+    void *expr;
+} indirection;
+
 typedef struct declaration_node {
     int type;
     int pointers;

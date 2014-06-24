@@ -1,25 +1,11 @@
 #include <stdio.h>
-#include <stdlib.h>
-
-typedef struct list {
-    int value;
-} list;
-
-typedef struct dummy {
-    list *list;
-} dummy;
-
-int func() {
-	auto int a = 3, b;
-	a = b * 3;
-}
 
 int main()
 {
-	int **a;
-	int b = a;
-	int c = &a;
-	printf("b is %d\n", b);
-	printf("c is %d\n", c);
-	return 0;
+    int a;
+    printf("sizeof(a) is %u\n", sizeof(a));
+    (char)a; // an expression with a cast is not an lvalue
+    printf("sizeof(a) is %u\n", sizeof(a));
+
+    return 0;
 }

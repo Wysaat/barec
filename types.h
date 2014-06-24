@@ -10,6 +10,7 @@ enum types {
     auto_storage_t = 5,
     expression_t = 6,
     array_ref_t = 7,
+    indirection_t = 8,
 };
 
 #endif /* TYPES_H */

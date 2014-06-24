@@ -1,2 +1,2 @@
-auto char **b = 33;
-b[2] = 4;
+auto char *b;
+b[2] = 55;

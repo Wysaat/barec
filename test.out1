@@ -1,8 +1,8 @@
-mov    eax, ebp-0
+mov    eax, [ebp-0]
 mov    ebx, eax
 mov    eax, 2
 mov    ecx, eax
-mov    eax, 1
+mov    eax, 4
 mul    ecx
 add    eax, ebx
 mov    ebx, eax

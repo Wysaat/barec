@@ -28,6 +28,10 @@ char *integer_get_value(void *vptr) {
     return buff_puts(buff);
 }
 
+char *integer_get_size(void *vptr) {
+    return strdup("mov    eax, 4\n");
+}
+
 char *identifier_get_value(void *vptr) {
     declaration_node *node = (declaration_node *)vptr;
     buffer *buff = buff_init();
@@ -59,12 +63,28 @@ char *identifier_get_addr(void *vptr) {
     }
 }
 
+char *identifier_get_size(void *vptr) {
+    declaration_node *node = (declaration_node *)vptr;
+    buffer *buff = buff_init();
+    if (node->pointers)
+        return strdup("mov    eax, 4\n");
+    else if (type(node->specifier) == int_specifier_t) {
+        int_specifier *specifier = (int_specifier *)node->specifier;
+        buff_add(buff, "mov    eax, ");
+        buff_addln(buff, itoa(specifier->size));
+        return buff_puts(buff);
+    }
+}
+
 char *array_ref_get_addr(void *vptr) {
     array_ref *expr = (array_ref *)vptr; 
     buffer *buff = buff_init();
-    buff_add(buff, get_addr(expr->primary));
-    buff_addln(buff, "mov    eax, ebx");
+    buff_add(buff, get_value(expr->primary));
+    buff_addln(buff, "mov    ebx, eax");
     buff_add(buff, get_value(expr->expr2));
+    buff_addln(buff, "mov    ecx, eax");
+    buff_add(buff, get_size(INDIRECTION(expr->primary)));
+    buff_addln(buff, "mul    ecx");
     buff_addln(buff, "add    eax, ebx");
     return buff_puts(buff);
 }
@@ -75,6 +95,42 @@ char *array_ref_get_value(void *vptr) {
     buff_add(buff, array_ref_get_addr(vptr));
     buff_addln(buff, "mov    eax, [eax]");
     return buff_puts(buff);
+}
+
+char *array_ref_get_size(void *vptr) {
+    array_ref *expr = (array_ref *)vptr;
+    return get_size(expr->primary);
+}
+
+indirection *INDIRECTION(void *expr) {
+    indirection *retptr = (indirection *)malloc(sizeof(indirection));
+    retptr->type = indirection_t;
+    retptr->expr = expr;
+    return retptr;
+}
+
+char *indirection_get_value(void *vptr) {
+    indirection *expr = (indirection *)vptr;
+    buffer *buff = buff_init();
+    buff_add(buff, get_value(expr->expr));
+    buff_addln(buff, "mov    eax, [eax]");
+    return buff_puts(buff);
+}
+
+char *indirection_get_addr(void *vptr) {
+    indirection *expr = (indirection *)vptr;
+    return get_value(expr->expr);
+}
+
+char *indirection_get_size(void *vptr) {
+    indirection *expr = (indirection *)vptr;
+}
+
+type *indirection_get_type(void *vptr) {
+    indirection *expr = (indirection *)vptr;
+    type *retptr = get_type(expr->expr);
+    retptr->pointers++;
+    return retptr;
 }
 
 char *expression_get_value(void *vptr) {
@@ -137,5 +193,16 @@ char *get_value(void *expr) {
             return array_ref_get_value(expr);
         case expression_t:
             return expression_get_value(expr);
+    }
+}
+
+char *get_size(void *expr) {
+    switch (type(expr)) {
+        case identifier_t:
+            return identifier_get_size(expr);
+        case integer_t:
+            return integer_get_size(expr);
+        case array_ref_t:
+            return array_ref_get_size(expr);
     }
 }

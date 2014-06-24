@@ -276,8 +276,25 @@ void *parse_postfix(FILE *stream) {
     }
 }
 
+void *parse_unary(FILE *stream) {
+    void *expr = parse_postfix(stream);
+    while (1) {
+        char *token = scan(stream);
+        if (!strcmp(token, "*")) {
+            indirection *new_expr = (indirection *)malloc(sizeof(indirection));
+            new_expr->type = indirection_t;
+            new_expr->expr = expr;
+            expr = new_expr;
+        }
+        else {
+            unscan(token, stream);
+            return expr;
+        }
+    }
+}
+
 void *parse_conditional(FILE *stream) {
-    return parse_postfix(stream);
+    return parse_unary(stream);
 }
 
 void *parse_assignment(FILE *stream) {
