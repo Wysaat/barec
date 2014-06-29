@@ -130,9 +130,11 @@ char *scan(FILE *stream) {
     return buffer;
 }
 
-void *parse_specifier(FILE *stream) {
+/* in the returned list, first if the storage specifier, the second is the type specifier */
+list *parse_specifier(FILE *stream) {
     char *token;
-    void *storage;
+    void *storage, *specifier;
+    list *retptr = list_node();
     int size, stype, sign = 0;
     while (1) {
         token = scan(stream);
@@ -163,54 +165,107 @@ void *parse_specifier(FILE *stream) {
         }
     }
     if (stype == 0) {
-        int_specifier *specifier = (int_specifier *)malloc(sizeof(int_specifier));
-        specifier->type = int_specifier_t;
-        specifier->storage = storage;
-        specifier->sign = sign;
-        specifier->size = size;
-        return specifier;
+        int_specifier *_specifier = (int_specifier *)malloc(sizeof(int_specifier));
+        _specifier->type = int_specifier_t;
+        _specifier->sign = sign;
+        _specifier->size = size;
+        specifier = _specifier;
     }
+    list_append(storage);
+    list_append(specifier);
+    return retptr;
+}
+
+char *get_declarator_id(void *vptr) {
+    return *(char **)((int *)vptr+1);
 }
 
 declarator *parse_declarator(FILE *stream) {
     char *token;
-    int pointers;
+    declarator *retptr = (declarator *)malloc(sizeof(declarator));
+    retptr->type = declarator_t;
+    retptr-pointers = 0;
     while (1) {
         token = scan(stream);
         if (!strcmp(token, "*"))
-            pointers++;
+            retptr->pointers++;
         else {
             unscan(token, stream);
             break;
         }
     }
-    token = scan(stream);
-    if (is_id(token)) {
-        declarator *retptr = (declarator *)malloc(sizeof(declarator));
-        retptr->pointers = pointers;
-        retptr->id = token;
-        return retptr;
+    retptr->direct_declarator = parse_direct_declarator(stream);
+    retptr->id = get_declarator_id(retptr->direct_declarator);
+    return retptr;
+}
+
+void *parse_direct_declarator(FILE *stream) {
+    char *token = scan(stream);
+    void *_declarator;
+    if (!strcmp(token, "(")) {
+        void *tmp = parse_declarator(stream);
+        token = scan(stream);
+        if (!strcmp(token, ")"))
+            _declarator = tmp;
+    }
+    else if (is_id(token)) {
+        id_declarator *tmp = (id_declarator *)malloc(sizeof(id_declarator));
+        tmp->type = id_declarator_t;
+        tmp->id = token;
+        _declarator = tmp;
+    }
+    char *id = get_declarator_id(_declarator);
+    while (1) {
+        token = scan(stream);
+        if (!strcmp(token, "[")) {
+            array_declarator *tmp = (array_declarator *)malloc(sizeof(array_declarator));
+            tmp->type = array_declarator_t;
+            tmp->id = id;
+            tmp->direct_declarator = _declarator;
+            token = scan(stream);
+            if (!strcmp(token, "]")) {
+                tmp->size_expr = 0;
+            }
+            else {
+                unscan(token, stream);
+                void *expr = parse_conditional(stream);
+                token = scan(stream);
+                if (!strcmp(token, "]")) {
+                    tmp->size_expr = expr;
+                }
+            }
+            _declarator = tmp;
+        }
+        else {
+            unscan(token);
+            return _declarator;
+        }
     }
 }
 
 expression_stmt *parse_declaration(FILE *stream) {
-    void *specifier = parse_specifier(stream);
+    list *specifiers = parse_specifier(stream);
+    void *storage = specifiers->next->content;
+    void *specifier = specifiers->next->next->content;
     declarator *dptr;
     char *token;
     list *assignment_list = list_node();
     expression_stmt *retptr;
     while (1) {
-        dptr = parse_declarator(stream);
-        declaration_node *node = (declaration_node *)malloc(sizeof(declaration_node));
-        node->pointers = dptr->pointers;
-        node->id = dptr->id;
+        declaration *node = (declaration *)malloc(sizeof(declaration));
+        node->type = declaration_t;
+        node->storage = storage;
         node->specifier = specifier;
-        list_append(declarations, node);
-        if (dptr->pointers)
-            stack_pointer += 4;
-        else {
-            if (type(specifier) == int_specifier_t)
-                stack_pointer += ((int_specifier *)specifier)->size;
+        node->declarator = parse_declarator(stream);
+        node->id = get_declarator_id(node->declarator);
+        list_append(declaration_list, node);
+        if (type(storage) == auto_storage_t) {
+            if (dptr->pointers)
+                stack_pointer += 4;
+            else {
+                if (type(specifier) == int_specifier_t)
+                    stack_pointer += ((int_specifier *)specifier)->size;
+            }
         }
         token = scan(stream);
         if (!strcmp(token, "=")) {
@@ -244,12 +299,10 @@ void *parse_primary(FILE *stream) {
     }
     else if (is_id(token)) {
         list *ptr;
-        for (ptr = declarations->next; ptr; ptr = ptr->next) {
-            declaration_node *node = (declaration_node *)ptr->content;
-            if (!strcmp(node->id, token)) {
-                node->type = identifier_t;
+        for (ptr = declaration_list->next; ptr; ptr = ptr->next) {
+            declaration *node = (declaration *)ptr->content;
+            if (!strcmp(token, node->id))
                 return node;
-            }
         }
     }
 }
@@ -353,7 +406,6 @@ int main(int argc, char **argv)
     FILE *istream = fopen(argv[1], "r");
     FILE *ostream = fopen(argv[2], "w");
     char *code;
-    declarations = list_node();
 
     buffer *buff = buff_init();
     expression_stmt *stmt = parse_declaration(istream);

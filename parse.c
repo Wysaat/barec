@@ -32,34 +32,42 @@ char *integer_get_size(void *vptr) {
     return strdup("mov    eax, 4\n");
 }
 
-char *identifier_get_value(void *vptr) {
-    declaration_node *node = (declaration_node *)vptr;
+char *declaration_get_addr(void *vptr) {
+    declaration *node = (declaration *)vptr;
     buffer *buff = buff_init();
-    if (type(node->specifier) == int_specifier_t) {
-        int_specifier *specifier = (int_specifier *)node->specifier;
-        if (type(specifier->storage) == auto_storage_t) {
-            auto_storage *storage = (auto_storage *)specifier->storage;
-            buff_add(buff, "mov    eax, ");
-            buff_add(buff, "[ebp-");
-            buff_add(buff, itoa(storage->stack_position));
-            buff_addln(buff, "]");
-            return buff_puts(buff);
-        }
+    if (type(node->storage) == auto_storage_t) {
+        buff_add(buff, "mov    eax, ");
+        buff_add(buff, "ebp-");
+        buff_addln(buff, itoa(((auto_storage *)storage)->stack_position));
+        return buff_puts(buff);
     }
 }
 
-char *identifier_get_addr(void *vptr) {
-    declaration_node *node = (declaration_node *)vptr;
+char *declaration_get_value(void *vptr) {
+    declaration *node = (declaration *)vptr;
     buffer *buff = buff_init();
+    char *size;
     if (type(node->specifier) == int_specifier_t) {
         int_specifier *specifier = (int_specifier *)node->specifier;
-        if (type(specifier->storage) == auto_storage_t) {
-            auto_storage *storage = (auto_storage *)specifier->storage;
-            buff_add(buff, "mov    eax, ");
-            buff_add(buff, "ebp-");
-            buff_addln(buff, itoa(storage->stack_position));
-            return buff_puts(buff);
+        switch (specifier->size) {
+            case 1:
+                size = "byte";
+                break;
+            case 2:
+                size = "word";
+                break;
+            case 4:
+                size = "dword";
+                break;
         }
+    }
+    if (type(node->storage) == auto_storage_t) {
+        buff_add(buff, "mov    eax, ");
+        buff_add(buff, size);
+        buff_add(buff, "[ebp-");
+        buff_add(buff, itoa(((auto_storage *)storage)->stack_position));
+        buff_addln(buff, "]");
+        return buff_puts(buff);
     }
 }
 
@@ -74,6 +82,13 @@ char *identifier_get_size(void *vptr) {
         buff_addln(buff, itoa(specifier->size));
         return buff_puts(buff);
     }
+}
+
+type *identifier_get_type(void *vptr) {
+    declaration_node *node = (declaration_node *)vptr;
+    type *retptr = (type *)malloc(sizeof(type));
+    retptr->pointers = node->pointers;
+    retptr->
 }
 
 char *array_ref_get_addr(void *vptr) {
@@ -204,5 +219,12 @@ char *get_size(void *expr) {
             return integer_get_size(expr);
         case array_ref_t:
             return array_ref_get_size(expr);
+    }
+}
+
+type *get_type(void *expr) {
+    switch (type(expr)) {
+        case identifier_t:
+            return identifier_get_type(expr);
     }
 }

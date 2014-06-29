@@ -3,8 +3,8 @@
 
 #include "barec.h"
 
-int stack_pointer;
-list *declarations;
+int stack_pointer = 0;
+list *declaration_list = list_node();
 
 typedef struct auto_storage {
     int type;
@@ -13,26 +13,33 @@ typedef struct auto_storage {
 
 typedef struct int_specifier {
     int type;
-    void *storage;  // storage class
-    // int qualifier; // type qualifier
     int sign;
     int size;
 } int_specifier;  // integral declaration specifier
 
 typedef struct declarator {
-    int pointers;
+    int type;
     char *id;
+    int pointers;
+    void *direct_declarator;
 } declarator;
+
+typedef struct id_declarator {
+    int type;
+    char *id;
+} id_declarator;
+
+typedef struct array_declarator {
+    int type;
+    char *id;
+    void *direct_declarator;
+    void *size_expr;
+} array_declarator;
 
 typedef struct init_declarator {
     declarator *declarator;
     void *initializer;  // can be 0
 } init_declarator;
-
-typedef struct declaration {
-    void *specifier;
-    list *init_declarator_list;
-} declaration;
 
 typedef struct integer {
     int type;
@@ -50,13 +57,13 @@ typedef struct indirection {
     void *expr;
 } indirection;
 
-typedef struct declaration_node {
+typedef struct declaration {
     int type;
-    int pointers;
     char *id;
+    void *storage;
     void *specifier;
-    int addr;
-} declaration_node;
+    declarator *declarator;
+} declarator;
 
 typedef struct assignment {
     int type;
@@ -76,8 +83,9 @@ typedef struct expression_stmt {
 
 char *scan(FILE *stream);
 
-void *parse_specifierr(FILE *stream);
+list *parse_specifier(FILE *stream);
 declarator *parse_declarator(FILE *stream);
+void *parse_direct_declarator(FILE *stream);
 expression_stmt *parse_declaration(FILE *stream);
 void *parse_primary(FILE *stream);
 void *parse_assignment(FILE *stream);
