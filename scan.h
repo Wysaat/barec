@@ -1,10 +1,12 @@
 #ifndef SCAN_H
 #define SCAN_H
 
-#include "barec.h"
+#include <stdio.h>
 
-int stack_pointer = 0;
-list *declaration_list = list_node();
+typedef struct list list;
+
+int stack_pointer;
+list *declaration_list;
 
 typedef struct auto_storage {
     int type;
@@ -41,29 +43,23 @@ typedef struct init_declarator {
     void *initializer;  // can be 0
 } init_declarator;
 
-typedef struct integer {
-    int type;
-    char *value;
-} integer;
-
-typedef struct array_ref {
-    int type;
-    void *primary;
-    void *expr2;
-} array_ref;
-
-typedef struct indirection {
-    int type;
-    void *expr;
-} indirection;
-
 typedef struct declaration {
     int type;
     char *id;
     void *storage;
     void *specifier;
     declarator *declarator;
-} declarator;
+} declaration;
+
+typedef struct integer {
+    int type;
+    char *value;
+} integer;
+
+typedef struct indirection {
+    int type;
+    void *expr;
+} indirection;
 
 typedef struct assignment {
     int type;
@@ -88,6 +84,7 @@ declarator *parse_declarator(FILE *stream);
 void *parse_direct_declarator(FILE *stream);
 expression_stmt *parse_declaration(FILE *stream);
 void *parse_primary(FILE *stream);
+void *parse_conditional(FILE *stream);
 void *parse_assignment(FILE *stream);
 void *parse_expression(FILE *stream);
 void *pares_expression_stmt(FILE *stream);

@@ -1,6 +1,8 @@
 #ifndef UTILS_H
 #define UTILS_H
 
+#include <stdio.h>
+
 void unscan(char *token, FILE *stream);
 void emit(char *words);
 void emitln(char *words);

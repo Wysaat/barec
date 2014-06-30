@@ -1,4 +1,10 @@
-#include "barec.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include "scan.h"
+#include "list.h"
+#include "utils.h"
+#include "types.h"
 
 char *scan(FILE *stream) {
     char *buffer = (char *)malloc(1024);
@@ -130,7 +136,7 @@ char *scan(FILE *stream) {
     return buffer;
 }
 
-/* in the returned list, first if the storage specifier, the second is the type specifier */
+/* in the returned list, first is the storage specifier, the second is the type specifier */
 list *parse_specifier(FILE *stream) {
     char *token;
     void *storage, *specifier;
@@ -171,20 +177,15 @@ list *parse_specifier(FILE *stream) {
         _specifier->size = size;
         specifier = _specifier;
     }
-    list_append(storage);
-    list_append(specifier);
+    list_append(retptr, storage);
+    list_append(retptr, specifier);
     return retptr;
-}
-
-char *get_declarator_id(void *vptr) {
-    return *(char **)((int *)vptr+1);
 }
 
 declarator *parse_declarator(FILE *stream) {
     char *token;
     declarator *retptr = (declarator *)malloc(sizeof(declarator));
-    retptr->type = declarator_t;
-    retptr-pointers = 0;
+    retptr->pointers = 0;
     while (1) {
         token = scan(stream);
         if (!strcmp(token, "*"))
@@ -195,26 +196,34 @@ declarator *parse_declarator(FILE *stream) {
         }
     }
     retptr->direct_declarator = parse_direct_declarator(stream);
-    retptr->id = get_declarator_id(retptr->direct_declarator);
+    void *vptr = retptr->direct_declarator;
+    if (type(vptr) == declarator_t)
+        retptr->id = ((declarator *)vptr)->id;
+    else if (type(vptr) == id_declarator_t)
+        retptr->id = ((id_declarator *)vptr)->id;
+    else if (type(vptr) == array_declarator_t)
+        retptr->id = ((array_declarator *)vptr)->id;
     return retptr;
 }
 
 void *parse_direct_declarator(FILE *stream) {
     char *token = scan(stream);
     void *_declarator;
+    char *id;
     if (!strcmp(token, "(")) {
-        void *tmp = parse_declarator(stream);
+        declarator *tmp = parse_declarator(stream);
         token = scan(stream);
         if (!strcmp(token, ")"))
             _declarator = tmp;
+        id = tmp->id;
     }
     else if (is_id(token)) {
         id_declarator *tmp = (id_declarator *)malloc(sizeof(id_declarator));
         tmp->type = id_declarator_t;
         tmp->id = token;
         _declarator = tmp;
+        id = tmp->id;
     }
-    char *id = get_declarator_id(_declarator);
     while (1) {
         token = scan(stream);
         if (!strcmp(token, "[")) {
@@ -237,7 +246,7 @@ void *parse_direct_declarator(FILE *stream) {
             _declarator = tmp;
         }
         else {
-            unscan(token);
+            unscan(token, stream);
             return _declarator;
         }
     }
@@ -257,7 +266,7 @@ expression_stmt *parse_declaration(FILE *stream) {
         node->storage = storage;
         node->specifier = specifier;
         node->declarator = parse_declarator(stream);
-        node->id = get_declarator_id(node->declarator);
+        node->id = node->declarator->id;
         list_append(declaration_list, node);
         if (type(storage) == auto_storage_t) {
             if (dptr->pointers)
@@ -309,36 +318,33 @@ void *parse_primary(FILE *stream) {
 
 void *parse_postfix(FILE *stream) {
     void *primary = parse_primary(stream);
-    while (1) {
-        char *token = scan(stream);
-        if (!strcmp(token, "[")) {
-            void *expr2 = parse_expression(stream);
-            char *token = scan(stream);
-            if (!strcmp(token, "]")) {
-                array_ref *expr = (array_ref *)malloc(sizeof(array_ref));
-                expr->type = array_ref_t;
-                expr->primary = primary;
-                expr->expr2 = expr2;
-                primary = expr;
-            }
-        }
-        else {
-            unscan(token, stream);
-            return primary;
-        }
-    }
+    return primary;
 }
 
 void *parse_unary(FILE *stream) {
-    void *expr = parse_postfix(stream);
+    char *token = scan(stream);
+    if (!strcmp(token, "*")) {
+        indirection *expr = (indirection *)malloc(sizeof(indirection));
+        expr->type = indirection_t;
+        expr->expr = parse_unary(stream);
+        return expr;
+    }
+    else {
+        unscan(token, stream);
+        return parse_postfix(stream);
+    }
+}
+
+void *parse_cast(FILE *stream) {
+    return parse_unary(stream);
+}
+
+void *parse_m_expr(FILE *stream) {
+    void *expr = parse_cast(stream);
     while (1) {
-        char *token = scan(stream);
-        if (!strcmp(token, "*")) {
-            indirection *new_expr = (indirection *)malloc(sizeof(indirection));
-            new_expr->type = indirection_t;
-            new_expr->expr = expr;
-            expr = new_expr;
-        }
+        token = scan(stream);
+        if (!strcmp(token, "*") || !strcmp(token, "/") || !strcmp(token, "%"))
+            expr = M_EXPR(token, expr, parse_cast(stream));
         else {
             unscan(token, stream);
             return expr;
@@ -347,7 +353,7 @@ void *parse_unary(FILE *stream) {
 }
 
 void *parse_conditional(FILE *stream) {
-    return parse_unary(stream);
+    return parse_m_expr(stream);
 }
 
 void *parse_assignment(FILE *stream) {
@@ -356,6 +362,7 @@ void *parse_assignment(FILE *stream) {
     if (!strcmp(token, "=")) {
         void *expr2 = parse_assignment(stream);
         assignment *retptr = (assignment *)malloc(sizeof(assignment));
+        retptr->type = assignment_t;
         retptr->expr1 = expr;
         retptr->expr2 = expr2;
         return retptr;
@@ -406,22 +413,16 @@ int main(int argc, char **argv)
     FILE *istream = fopen(argv[1], "r");
     FILE *ostream = fopen(argv[2], "w");
     char *code;
+    stack_pointer = 0;
+    declaration_list = list_node();
 
-    buffer *buff = buff_init();
     expression_stmt *stmt = parse_declaration(istream);
-    if (stmt) {
-        genCode(stmt, buff);
-        code = buff_puts(buff);
-        fwrite(code, 1, strlen(code), ostream);
-    }
 
     buffer *buff2 = buff_init();
     stmt = parse_expression_stmt(istream);
-    if (stmt) {
-        genCode(stmt, buff2);
-        code = buff_puts(buff2);
-        fwrite(code, 1, strlen(code), ostream);
-    }
+    gen_code(stmt, buff2);
+    code = buff_puts(buff2);
+    fwrite(code, 1, strlen(code), ostream);
 
     fclose(istream);
     fclose(ostream);

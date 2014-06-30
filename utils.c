@@ -1,4 +1,6 @@
-#include "barec.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 void unscan(char *token, FILE *stream) {
     char *ptr = token;

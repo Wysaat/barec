@@ -1,4 +1,6 @@
-#include "barec.h"
+#include <stdlib.h>
+#include <string.h>
+#include "list.h"
 
 list *list_node() {
     list *retptr = (list *)malloc(sizeof(list));

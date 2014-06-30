@@ -1,8 +1,6 @@
 #ifndef LIST_H
 #define LIST_H
 
-#include "barec.h"
-
 typedef struct list list;
 typedef struct buffer buffer;
 

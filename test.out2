@@ -1,8 +1,4 @@
 mov    eax, dword [ebp-0]
-mov    eax, [eax]
-mov    eax, [eax]
-mov    eax, [eax]
-mov    eax, [eax]
 mov    ebx, eax
 mov    eax, 32
 mov    [ebx], eax
