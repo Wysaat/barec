@@ -4,21 +4,20 @@
 #include "types.h"
 #include "scan.h"
 
-int integer_get_value(void *vptr, buffer *buff) {
-    integer *expr = (integer *)vptr;
-    buff_add(buff, "mov    eax, ");
-    buff_addln(buff, expr->value);
-    return 4;
+void *arithmetic_get_value(void *vptr, buffer *buff) {
+    arithmetic *expr = (arithmetic *)vptr;
+    if (expr->specifier->atype == int_t) {
+        buff_add(buff, "mov    eax, ");
+        buff_addln(buff, expr->value);
+    }
+    return expr->specifier;
 }
 
 int declaration_get_value(void *vptr, buffer *buff) {
     declaration *node = (declaration *)vptr;
     char *size;
-    int retval;
-    if (node->declarator->pointers > 0) {
-        retval = 4;
+    if (node->declarator->pointers > 0)
         size = "dword";
-    }
     else if (type(node->specifier) == int_specifier_t) {
         int_specifier *specifier = (int_specifier *)node->specifier;
         retval = specifier->size;

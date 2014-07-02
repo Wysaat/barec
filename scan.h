@@ -7,17 +7,23 @@ typedef struct list list;
 
 int stack_pointer;
 list *declaration_list;
+list *specifier_list;
 
 typedef struct auto_storage {
     int type;
     int stack_position;
 } auto_storage;
 
-typedef struct int_specifier {
+typedef struct arithmetic_specifier {
     int type;
-    int sign;
-    int size;
-} int_specifier;  // integral declaration specifier
+    enum atypes atype;
+} arithmetic_specifier;
+
+typedef struct struct_specifier {
+    int type;
+    char *id;
+    list *declaration_list;
+} struct_specifier;
 
 typedef struct declarator {
     int type;
@@ -38,11 +44,6 @@ typedef struct array_declarator {
     void *size_expr;
 } array_declarator;
 
-typedef struct init_declarator {
-    declarator *declarator;
-    void *initializer;  // can be 0
-} init_declarator;
-
 typedef struct declaration {
     int type;
     char *id;
@@ -51,15 +52,24 @@ typedef struct declaration {
     declarator *declarator;
 } declaration;
 
-typedef struct integer {
+typedef struct arithmetic {
     int type;
     char *value;
-} integer;
+    arithmetic_specifier *specifier;
+} arithmetic;
 
 typedef struct indirection {
     int type;
     void *expr;
+    void *specifier;
 } indirection;
+
+typedef struct m_expr {
+    int type;
+    char *op;
+    void *left;
+    void *right;
+} m_expr;
 
 typedef struct assignment {
     int type;

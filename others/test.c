@@ -1,25 +1,20 @@
 #include <stdio.h>
+#include <stddef.h>
 
-typedef struct list list;
-
-struct tom {
-    int a;
-    int b;
-    int c;
-};
-
-struct list {
-    struct tom t;
-    int m;
-};
+int f(int x)
+{
+    struct what {
+        int tee[x];
+        char gee[x*8];
+        int b;
+    };
+    return sizeof(struct what);
+}
 
 int main()
 {
-    int a;
-    long long b;
-    a = 3;
-    b = 432;
-    int c = a * b;
-
+    int a[31][47];
+    // a = 43242;
+    printf("sizeof(a) is %lu, a is %u, a + 1 is %u\n", sizeof(a), a, a + 1);
     return 0;
 }
