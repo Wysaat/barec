@@ -1,0 +1,180 @@
+gcc scan.c parse.c gencode.c utils.c -o scan -g -m32
+parse.c: In function ‘STRING’:
+parse.c:78:11: error: ‘string’ has no member named ‘data_position’
+     retptr->data_position = data_position;
+           ^
+parse.c:78:29: error: ‘data_position’ undeclared (first use in this function)
+     retptr->data_position = data_position;
+                             ^
+parse.c:78:29: note: each undeclared identifier is reported only once for each function it appears in
+parse.c: In function ‘STRUCT_REF’:
+parse.c:99:47: error: expected expression before ‘)’ token
+     struct_specifier *specifier = (specifier *)type_list->content;
+                                               ^
+parse.c:100:10: error: ‘ptr’ undeclared (first use in this function)
+     for (ptr = specifier->declaration_list->next; ptr; ptr = ptr->next) {
+          ^
+parse.c:101:39: error: ‘expr’ undeclared (first use in this function)
+         if (!strcmp(ptr->content->id, expr->id)) {
+                                       ^
+parse.c: In function ‘UNARY’:
+parse.c:149:11: error: ‘unary’ has no member named ‘expr’
+     retptr->expr = expr;
+           ^
+parse.c: In function ‘CAST’:
+parse.c:167:20: error: ‘cast_t’ undeclared (first use in this function)
+     retptr->type = cast_t;
+                    ^
+parse.c:168:11: error: ‘cast’ has no member named ‘expr’
+     retptr->expr = expr;
+           ^
+parse.c: In function ‘M_EXPR’:
+parse.c:187:9: error: ‘ltype’ undeclared (first use in this function)
+     if (ltype->a)
+         ^
+parse.c: In function ‘arithmetic_convertion’:
+parse.c:221:13: error: invalid type argument of ‘->’ (have ‘unsigned int’)
+     if (left->atype == long_double_t || right == long_double_t)
+             ^
+parse.c:222:9: error: ‘res’ undeclared (first use in this function)
+         res = long_double_t;
+         ^
+parse.c:227:55: error: ‘unsinged_long_long_t’ undeclared (first use in this function)
+     else if (left == unsigned_long_long_t || right == unsinged_long_long_t)
+                                                       ^
+parse.c:228:9: error: ‘rres’ undeclared (first use in this function)
+         rres = unsigned_long_long_t;
+         ^
+parse.c:231:22: error: ‘unisgned_int_t’ undeclared (first use in this function)
+     else if (left == unisgned_int_t || right == unsigned_int_t)
+                      ^
+parse.c: In function ‘get_type_list’:
+parse.c:249:55: warning: incompatible implicit declaration of built-in function ‘strlen’ [enabled by default]
+             ptr->content = array_init(ARITHMETIC(itoa(strlen(((string *)vptr)->value))));
+                                                       ^
+parse.c:249:13: error: too few arguments to function ‘ARITHMETIC’
+             ptr->content = array_init(ARITHMETIC(itoa(strlen(((string *)vptr)->value))));
+             ^
+parse.c:67:13: note: declared here
+ arithmetic *ARITHMETIC(char *value, int atype) {
+             ^
+parse.c:250:25: warning: dereferencing ‘void *’ pointer [enabled by default]
+             ptr->content->next = arithmetic_specifier_init(char_t);
+                         ^
+parse.c:250:25: error: request for member ‘next’ in something not a structure or union
+gencode.c: In function ‘declaration_gencode’:
+gencode.c:13:13: error: a label can only be part of a statement and a declaration is not a statement
+             arithmetic *a_expr = expr->type_list->content;
+             ^
+gencode.c:14:27: error: ‘arithmetic’ has no member named ‘atype’
+             switch (a_expr->atype) {
+                           ^
+gencode.c: In function ‘arithmetic_gencode’:
+gencode.c:42:13: error: a label can only be part of a statement and a declaration is not a statement
+             long long val = atoll(expr->value);
+             ^
+gencode.c: In function ‘addr_gencode’:
+gencode.c:60:28: warning: dereferencing ‘void *’ pointer [enabled by default]
+         if (type(expr->expr->storage) == auto_storage_t) {
+                            ^
+gencode.c:60:28: error: request for member ‘storage’ in something not a structure or union
+gencode.c:61:47: warning: dereferencing ‘void *’ pointer [enabled by default]
+             auto_storage *storage = expr->expr->storage;
+                                               ^
+gencode.c:61:47: error: request for member ‘storage’ in something not a structure or union
+gencode.c:75:20: error: ‘indirection’ has no member named ‘epxr’
+         gencode(ind->epxr);
+                    ^
+gencode.c: In function ‘m_expr_gencode’:
+gencode.c:87:9: error: duplicate case value
+         case unsigned_long_long_t:
+         ^
+gencode.c:85:9: error: previously used here
+         case float_t:
+         ^
+gencode.c:113:9: error: duplicate case value
+         case long_long_t:
+         ^
+gencode.c:83:9: error: previously used here
+         case double_t:
+         ^
+gencode.c:118:26: error: ‘right’ undeclared (first use in this function)
+             gencode(expr-right);
+                          ^
+gencode.c:118:26: note: each undeclared identifier is reported only once for each function it appears in
+gencode.c: In function ‘a_expr_gencode’:
+gencode.c:144:9: error: duplicate case value
+         case unsigned_long_long_t: case long_long_t:
+         ^
+gencode.c:142:9: error: previously used here
+         case float_t:
+         ^
+gencode.c:144:36: error: duplicate case value
+         case unsigned_long_long_t: case long_long_t:
+                                    ^
+gencode.c:140:9: error: previously used here
+         case double_t:
+         ^
+gencode.c:166:26: error: ‘right’ undeclared (first use in this function)
+             gencode(expr-right);
+                          ^
+gencode.c: In function ‘gencode’:
+gencode.c:229:14: error: ‘m_expr_t’ undeclared (first use in this function)
+         case m_expr_t: m_expr_gencode(expr); break;
+              ^
+gencode.c:230:14: error: ‘a_expr_t’ undeclared (first use in this function)
+         case a_expr_t: a_expr_gencode(expr); break;
+              ^
+utils.c: In function ‘itoa’:
+utils.c:39:28: warning: incompatible implicit declaration of built-in function ‘malloc’ [enabled by default]
+     char *retptr = (char *)malloc(n+1);
+                            ^
+utils.c: In function ‘list_node’:
+utils.c:50:28: warning: incompatible implicit declaration of built-in function ‘malloc’ [enabled by default]
+     list *retptr = (list *)malloc(sizeof(list));
+                            ^
+utils.c:51:5: warning: incompatible implicit declaration of built-in function ‘memset’ [enabled by default]
+     memset(retptr, 0, sizeof(list));
+     ^
+utils.c: In function ‘list_init’:
+utils.c:56:28: warning: incompatible implicit declaration of built-in function ‘malloc’ [enabled by default]
+     list *retptr = (list *)malloc(sizeof(list));
+                            ^
+utils.c:58:9: error: expected identifier or ‘(’ before ‘->’ token
+     list->prev = 0;
+         ^
+utils.c:59:9: error: expected identifier or ‘(’ before ‘->’ token
+     list->next = 0;
+         ^
+utils.c: In function ‘buff_init’:
+utils.c:85:32: warning: incompatible implicit declaration of built-in function ‘malloc’ [enabled by default]
+     buffer *retptr = (buffer *)malloc(sizeof(buffer));
+                                ^
+utils.c: In function ‘buff_add’:
+utils.c:96:33: warning: incompatible implicit declaration of built-in function ‘strdup’ [enabled by default]
+     buff->head->prev->content = strdup(string);
+                                 ^
+utils.c: In function ‘buff_addln’:
+utils.c:101:15: warning: incompatible implicit declaration of built-in function ‘strlen’ [enabled by default]
+     int len = strlen(string);
+               ^
+utils.c:103:5: warning: incompatible implicit declaration of built-in function ‘strcpy’ [enabled by default]
+     strcpy(new_string, string);
+     ^
+utils.c: In function ‘buff_puts’:
+utils.c:113:16: warning: incompatible implicit declaration of built-in function ‘strdup’ [enabled by default]
+         return strdup("");
+                ^
+utils.c:115:16: warning: incompatible implicit declaration of built-in function ‘strlen’ [enabled by default]
+         len += strlen(ptr->content);
+                ^
+utils.c:118:28: warning: incompatible implicit declaration of built-in function ‘malloc’ [enabled by default]
+     char *retptr = (char *)malloc(len+1);
+                            ^
+utils.c:120:9: warning: incompatible implicit declaration of built-in function ‘strcpy’ [enabled by default]
+         strcpy(retptr+offs, ptr->content);
+         ^
+utils.c:121:17: warning: incompatible implicit declaration of built-in function ‘strlen’ [enabled by default]
+         offs += strlen(ptr->content);
+                 ^
+make: *** [all] Error 1

@@ -1,4 +1,0 @@
-mov    eax, dword [ebp-0]
-mov    ebx, eax
-mov    eax, 32
-mov    [ebx], eax
