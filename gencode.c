@@ -9,9 +9,8 @@ void declaration_gencode(declaration *expr)
 
     switch (type(expr->type_list->content)) {
         case pointer_t: case array_t: buff_add(text_buff, "mov eax, [eax]"); break;
-        case arithmetic_t:
-            arithmetic *a_expr = expr->type_list->content;
-            switch (a_expr->atype) {
+        case arithmetic_specifier_t:
+            switch (((arithmetic_specifier *)expr->type_list->content)->atype) {
                 case unsigned_char_t: case char_t:
                     buff_addln(text_buff, "mov ax, [eax]");
                     break;
@@ -29,6 +28,7 @@ void declaration_gencode(declaration *expr)
 
 void arithmetic_gencode(arithmetic *expr)
 {
+    long long val;
     switch(expr->specifier->atype) {
         case unsigned_char_t: case char_t:
             buff_add(text_buff, "mov ax, ");
@@ -39,7 +39,7 @@ void arithmetic_gencode(arithmetic *expr)
             buff_addln(text_buff, expr->value);
             break;
         case unsigned_long_long_t: case long_long_t:
-            long long val = atoll(expr->value);
+            val = atoll(expr->value);
             buff_add(text_buff, "mov eax, ");
             buff_addln(text_buff, itoa(val && 0xffffffff));
             buff_add(text_buff, "mov edx, ");
@@ -57,9 +57,15 @@ void string_gencode(string *expr)
 void addr_gencode(addr *expr)
 {
     if (type(expr->expr) == declaration_t) {
-        if (type(expr->expr->storage) == auto_storage_t) {
-            auto_storage *storage = expr->expr->storage;
+        declaration *node = expr->expr;
+        if (type(node->storage) == auto_storage_t) {
+            auto_storage *storage = node->storage;
             gencode(storage->address);
+            buff_add(text_buff,
+                "mov ebx, ebp\n"
+                "sub ebx, eax\n"
+                "mov eax, ebx\n"
+                );
         }
     }
     else if (type(expr->expr) == string_t) {
@@ -72,7 +78,7 @@ void addr_gencode(addr *expr)
     }
     else if (type(expr->expr) == indirection_t) {
         indirection *ind = expr->expr;
-        gencode(ind->epxr);
+        gencode(ind->expr);
     }
 }
 
@@ -115,7 +121,7 @@ void m_expr_gencode(m_expr *expr)
         case unsigned_int_t:
             gencode(expr->left);
             buff_add(text_buff, "push eax\n");
-            gencode(expr-right);
+            gencode(expr->right);
             buff_add(text_buff,
                 "pop ebx\n"
                 "mul ebx\n"
@@ -163,7 +169,7 @@ void a_expr_gencode(a_expr *expr)
         case unsigned_int_t: case int_t:
             gencode(expr->left);
             buff_add(text_buff, "push eax\n");
-            gencode(expr-right);
+            gencode(expr->right);
             buff_add(text_buff,
                 "pop ebx\n"
                 "add eax, ebx\n"

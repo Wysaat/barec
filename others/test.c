@@ -1,2 +1,2 @@
-int a;
+auto int a;
 a = 3;

@@ -1,0 +1,11 @@
+section .data:
+section .bss:
+section .text:
+mov eax, 0
+mov ebx, ebp
+sub ebx, eax
+mov eax, ebx
+push eax
+mov eax, 3
+pop ebx
+mov [ebx], eax

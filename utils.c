@@ -1,3 +1,6 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include "barec.h"
 
 void unscan(char *token, FILE *stream) {
@@ -10,19 +13,28 @@ void unscan(char *token, FILE *stream) {
     ungetc(*ptr, stream);
 }
 
-int is_id(char *token) {
+inline int is_id(char *token) {
     return (*token == '_' || (*token >= 'a' && *token <= 'z') || (*token >= 'A' && *token <= 'Z'));
 }
 
-int is_int(char *token) {
-    while (*token)
-        if (!(*token >= '0' && *token++ <= '9'))
+inline int is_int(char *token) {
+    while (*token) {
+        if (!(*token >= '0' && *token <= '9'))
             return 0;
+        token++;
+    }
     return 1;
 }
 
-int is_char(char *token) {
-	return (*token == '\'');
+inline int is_float(char *token) {
+    if (!(*token >= '0' || *token <= '9') && *token != '.')
+        return 0;
+    while (*token) {
+        if (*token == '.' || *token == 'e' || *token == 'E')
+            return 1;
+        *token++;
+    }
+    return 0;
 }
 
 char *itoa(int value) {
@@ -55,8 +67,8 @@ list *list_node() {
 list *list_init(void *content) {
     list *retptr = (list *)malloc(sizeof(list));
     retptr->content = content;
-    list->prev = 0;
-    list->next = 0;
+    retptr->prev = 0;
+    retptr->next = 0;
     return retptr;
 }
 

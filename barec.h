@@ -35,6 +35,9 @@ enum types {
     indirection_t,
     unary_t,
     sizeof_t,
+    cast_t,
+    m_expr_t,
+    a_expr_t,
     assignment_t,
     expression_t,
     expression_stmt_t,
@@ -54,9 +57,9 @@ enum atypes {
     long_t = 7,    // 4 bytes
     unsigned_long_long_t = 8, // 8 bytes
     long_long_t = 9, // 8 bytes
-    float_t = 8,          // 4 bytes
-    double_t = 9,         // 8 bytes
-    long_double_t = 10,   // 12 bytes
+    float_t = 10,          // 4 bytes
+    double_t = 11,         // 8 bytes
+    long_double_t = 12,   // 12 bytes
 };
 
 typedef struct auto_storage {
@@ -157,7 +160,7 @@ typedef struct indirection {
 typedef struct unary {
     int type;
     char *op;
-    void *expression;
+    void *expr;
     list *type_list;
 } unary;
 
@@ -170,7 +173,7 @@ typedef struct size {
 typedef struct cast {
     int type;
     list *type_list;
-    struct cast *expression;
+    struct cast *expr;
 } cast;
 
 typedef struct m_expr {
@@ -256,10 +259,12 @@ list *get_type_list(void *vptr);
  * utils.c
  */
 
+#define is_str(token) (*token == '"')
+#define is_char(token) (*token == '\'')
+
 void unscan(char *token, FILE *stream);
 int is_id(char *token);
 int is_int(char *token);
-int is_char(char *token);
 char *itoa(int value);
 
 /* the list has an empty head */

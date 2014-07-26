@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <string.h>
 #include "barec.h"
 
 int type(void *stmt) {
@@ -75,7 +76,7 @@ arithmetic *ARITHMETIC(char *value, int atype) {
 string *STRING(int address, char *value) {
     string *retptr = (string *)malloc(sizeof(string));
     retptr->type = string_t;
-    retptr->data_position = data_position;
+    retptr->address = address;
     retptr->value = value;
     return retptr;
 }
@@ -95,11 +96,11 @@ struct_ref *STRUCT_REF(void *primary, char *id) {
     retptr->primary = primary;
     retptr->id = id;
 
-    list *type_list = get_type_list(primary);
-    struct_specifier *specifier = (specifier *)type_list->content;
+    list *type_list = get_type_list(primary), *ptr;
+    struct_specifier *specifier = type_list->content;
     for (ptr = specifier->declaration_list->next; ptr; ptr = ptr->next) {
-        if (!strcmp(ptr->content->id, expr->id)) {
-            retptr->type_list = ptr->content->type_list;
+        if (!strcmp(((declaration *)ptr->content)->id, id)) {
+            retptr->type_list = ((declaration *)ptr->content)->type_list;
             break;
         }
     }
@@ -172,6 +173,7 @@ cast *CAST(list *type_list, cast *expr)
 m_expr *M_EXPR(char *op, void *expr1, void *expr2)
 {
     m_expr *retptr = (m_expr *)malloc(sizeof(m_expr));
+    retptr->type = m_expr_t;
     retptr->op = op;
     retptr->left = expr1;
     retptr->right = expr2;
@@ -184,13 +186,13 @@ m_expr *M_EXPR(char *op, void *expr1, void *expr2)
         retptr->left = CAST(retptr->type_list, expr1);
     if (rspecifier != specifier)
         retptr->right = CAST(retptr->type_list, expr2);
-    if (ltype->a)
     return retptr;
 }
 
 a_expr *A_EXPR(char *op, void *expr1, void *expr2)
 {
     a_expr *retptr = (a_expr *)malloc(sizeof(a_expr));
+    retptr->type = a_expr_t;
     retptr->op = op;
     retptr->type_list = list_node();
     retptr->left = expr1;
@@ -217,18 +219,18 @@ a_expr *A_EXPR(char *op, void *expr1, void *expr2)
 
 arithmetic_specifier *arithmetic_convertion(arithmetic_specifier *ls, arithmetic_specifier *rs)
 {
-    enum atypes left = ls->atype, right = rs->atype;
-    if (left->atype == long_double_t || right == long_double_t)
+    enum atypes left = ls->atype, right = rs->atype, res;
+    if (left == long_double_t || right == long_double_t)
         res = long_double_t;
     else if (left == double_t || right == double_t)
         res = double_t;
     else if (left == float_t || right == float_t)
         res = float_t;
-    else if (left == unsigned_long_long_t || right == unsinged_long_long_t)
-        rres = unsigned_long_long_t;
+    else if (left == unsigned_long_long_t || right == unsigned_long_long_t)
+        res = unsigned_long_long_t;
     else if (left == long_long_t || right == long_long_t)
         res = long_long_t;
-    else if (left == unisgned_int_t || right == unsigned_int_t)
+    else if (left == unsigned_int_t || right == unsigned_int_t)
         res = unsigned_int_t;
     else /* integral promotion */
         res = int_t;
@@ -246,8 +248,9 @@ list *get_type_list(void *vptr)
             return ptr;
         case string_t:
             ptr = list_node();
-            ptr->content = array_init(ARITHMETIC(itoa(strlen(((string *)vptr)->value))));
-            ptr->content->next = arithmetic_specifier_init(char_t);
+            ptr->content = array_init(ARITHMETIC(itoa(strlen(((string *)vptr)->value)), int_t));
+            ptr->next = list_node();
+            ptr->next->content = arithmetic_specifier_init(char_t);
             return ptr;
         case declaration_t:
             return ((declaration *)vptr)->type_list;

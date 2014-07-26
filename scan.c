@@ -234,7 +234,7 @@ declarator *parse_declarator(FILE *stream) {
     while (1) {
         token = scan(stream);
         if (!strcmp(token, "*")) {
-            type_list->prev->content = list_init(pointer_init());
+            type_list->prev = list_init(pointer_init());
             type_list = type_list->prev;
         }
         else {
@@ -248,12 +248,14 @@ declarator *parse_declarator(FILE *stream) {
         declarator *dptr = parse_declarator(stream);
         id = dptr->id;
         list *nlist = dptr->type_list;
-        list *ptr = nlist;
-        while (ptr->next)
-            ptr = ptr->next;
-        ptr->prev->next = type_list;
-        free(ptr);
-        type_list = nlist;
+        if (nlist->next) {
+            list *ptr = nlist;
+            while (ptr->next)
+                ptr = ptr->next;
+            ptr->prev->next = type_list;
+            free(ptr);
+            type_list = nlist;
+        }
     }
     else if (is_id(token))
         id = token;
@@ -288,10 +290,13 @@ void parse_declaration(FILE *stream, list *declaration_list) {
     while (1) {
         declarator *dptr = parse_declarator(stream);
         list *type_list = dptr->type_list;
-        list *ptr = type_list;
-        while (ptr->next)
-            ptr = ptr->next;
-        ptr->prev->next = specifier;
+        if (type_list->next) {
+            list *ptr = type_list;
+            while (ptr->next)
+                ptr = ptr->next;
+            ptr->prev->next->content = specifier;
+        }
+        type_list->content = specifier;
         char *id = dptr->id;
         declaration *node;
         if (type(storage) == auto_storage_t) {
@@ -372,6 +377,10 @@ void *parse_postfix(FILE *stream) {
         else if (!strcmp(token, "--")) {
             primary = POSINC(primary, 0);
         }
+        else {
+            unscan(token, stream);
+            return primary;
+        }
     }
 }
 
@@ -411,6 +420,10 @@ void *parse_cast(FILE *stream) {
         token = scan(stream);
         if (!strcmp(token, ")"))
             return CAST(type_list, parse_cast(stream));
+    }
+    else {
+        unscan(token, stream);
+        return parse_unary(stream);
     }
 }
 
@@ -507,11 +520,13 @@ int main(int argc, char **argv)
     bss_buff = buff_init();
     text_buff = buff_init();
     auto_size = ARITHMETIC(strdup("0"), int_t);
+    data_size = 0;
     struct_s_list = list_node();
+    declaration_list = list_node();
 
     parse_declaration(istream, declaration_list);
     void *stmt = parse_expression_stmt(istream);
-    gen_code(stmt);
+    gencode(stmt);
     char *data_section = buff_puts(data_buff);
     char *bss_section = buff_puts(bss_buff);
     char *text_section = buff_puts(text_buff);
