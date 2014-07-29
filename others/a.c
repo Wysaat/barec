@@ -2,11 +2,12 @@
 
 int main()
 {
-	float a = .43242;
-	.43242e3;
-	442.4324242e+4;
-	4324242.e4;
-	43423e3;
-	char *(t)[3];
+	long long *a;
+	a + 3;
+	printf("a is %p, a + 3 is %p\n", a, a + 3);
+	*(a + 432);
+	int b;
+	*b;
+
 	return 0;
 }

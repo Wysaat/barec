@@ -17,24 +17,20 @@ enum types {
     auto_storage_t,
     static_storage_t,
     extern_storage_t,
-
     arithmetic_specifier_t,
     struct_specifier_t,
-
     declarator_t,
     id_declarator_t,
     array_declarator_t,
     declaration_t,
     arithmetic_t,
     string_t,
-    array_ref_t,
     struct_ref_t,
     posinc_t,
     preinc_t,
     addr_t,
     indirection_t,
     unary_t,
-    sizeof_t,
     cast_t,
     m_expr_t,
     a_expr_t,
@@ -108,21 +104,15 @@ typedef struct declaration {
 typedef struct arithmetic {
     int type;
     char *value;
-    arithmetic_specifier *specifier;
+    list *type_list;
 } arithmetic;
 
 typedef struct string {
     int type;
     int address;
     char *value;
-} string;
-
-typedef struct array_ref {
-    int type;
-    void *primary;
-    void *expr;
     list *type_list;
-} array_ref;
+} string;
 
 typedef struct struct_ref {
     int type;
@@ -164,12 +154,6 @@ typedef struct unary {
     list *type_list;
 } unary;
 
-typedef struct size {
-    int type;
-    void *expr;
-    list *type_list;
-} size;
-
 typedef struct cast {
     int type;
     list *type_list;
@@ -201,6 +185,7 @@ typedef struct assignment {
 typedef struct expression {
     int type;
     list *assignment_list;
+    list *type_list;
 } expression;
 
 typedef struct expression_stmt {
@@ -241,19 +226,24 @@ declarator *declartor_init(char *id, list *type_list);
 declaration *declaration_init(char *id, void *storage, list *type_list);
 arithmetic *ARITHMETIC(char *value, int atype);
 string *STRING(int address, char *value);
-array_ref *ARRAY_REF(void *primary, void *expr);
+indirection *ARRAY_REF(void *primary, void *expr);
 struct_ref *STRUCT_REF(void *primary, char *id);
 posinc *POSINC(void *primary, int inc);
 preinc *PREINC(void *expr, int inc);
 addr *ADDR(void *expr);
 indirection *INDIRECTION(void *expr);
 unary *UNARY(void *expr, char *op);
-size *SIZE(void *expr);
+void *SIZE(list *type_list);
+void *SIZE2(void *expr);
 cast *CAST(list *type_list, cast *expr);
 m_expr *M_EXPR(char *op, void *expr1, void *expr2);
 a_expr *A_EXPR(char *op, void *expr1, void *expr2);
+expression *EXPRESSION(list *assignment_list, list *type_list);
 arithmetic_specifier *arithmetic_convertion(arithmetic_specifier *ls, arithmetic_specifier *rs);
+arithmetic_specifier *integral_promotion(arithmetic_specifier *s);
+list *integral_promotion2(list *type_list);
 list *get_type_list(void *vptr);
+void set_type_list(list *type_list, void *vptr);
 
 /*
  * utils.c

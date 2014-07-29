@@ -228,7 +228,7 @@ list *parse_specifier(FILE *stream) {
 
 declarator *parse_declarator(FILE *stream) {
     char *token;
-    list *type_list = list_node();
+    list *type_list = list_node(), *tmp;
     char *id = 0;
 
     while (1) {
@@ -266,12 +266,16 @@ declarator *parse_declarator(FILE *stream) {
             token = scan(stream);
             if (!strcmp(token, "]")) {
                 type_list->prev = list_init(array_init(0));
+                tmp = type_list;
                 type_list = type_list->prev;
+                type_list->next = tmp;
             }
             else {
                 unscan(token, stream);
                 type_list->prev = list_init(array_init(parse_conditional(stream)));
+                tmp = type_list;
                 type_list = type_list->prev;
+                type_list->next = tmp;
                 token = scan(stream);
             }
         }
@@ -296,14 +300,15 @@ void parse_declaration(FILE *stream, list *declaration_list) {
                 ptr = ptr->next;
             ptr->prev->next->content = specifier;
         }
-        type_list->content = specifier;
+        else
+            type_list->content = specifier;
         char *id = dptr->id;
         declaration *node;
         if (type(storage) == auto_storage_t) {
             auto_storage *a_storage = auto_storage_init();
             a_storage->address = auto_size;
             node = declaration_init(id, a_storage, type_list);
-            auto_size = A_EXPR("+", auto_size, SIZE(node));
+            auto_size = A_EXPR("+", auto_size, SIZE(node->type_list));
         }
         list_append(declaration_list, node);
 
@@ -358,7 +363,8 @@ void *parse_postfix(FILE *stream) {
     while (1) {
         token = scan(stream);
         if (!strcmp(token, "[")) {
-            if (type(get_type_list(primary)->content) == array_t) {
+            int t = type(get_type_list(primary)->content);
+            if (t == array_t || t == pointer_t) {
                 primary = ARRAY_REF(primary, parse_expression(stream));
                 token = scan(stream);
             }
@@ -478,14 +484,12 @@ void *parse_expression(FILE *stream) {
     list *assignment_list = list_node();
     char *token;
     while (1) {
-        list_append(assignment_list, parse_assignment(stream));
+        void *assignment = parse_assignment(stream);
+        list_append(assignment_list, assignment);
         token = scan(stream);
         if (strcmp(token, ",")) {
             unscan(token, stream);
-            expression *retptr = (expression *)malloc(sizeof(expression));
-            retptr->type = expression_t;
-            retptr->assignment_list = assignment_list;
-            return retptr;
+            return EXPRESSION(assignment_list, get_type_list(assignment));
         }
     }
 }

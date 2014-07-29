@@ -111,7 +111,7 @@ void buff_add(buffer *buff, char *string) {
 
 void buff_addln(buffer *buff, char *string) {
     int len = strlen(string);
-    char new_string[len+2];
+    char new_string[len+3];
     strcpy(new_string, string);
     new_string[len] = '\n';
     new_string[len+1] = 0;

@@ -1,2 +1,2 @@
-auto int a;
-a = 3;
+auto long long a[3];
+a[2] = -343;
