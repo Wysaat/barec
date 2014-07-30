@@ -79,8 +79,6 @@ void addr_gencode(addr *expr)
     else if (type(expr->expr) == string_t) {
         string_gencode(expr->expr);
     }
-    else if (type(expr->expr) == struct_ref_t) {
-    }
     else if (type(expr->expr) == indirection_t) {
         indirection *ind = expr->expr;
         gencode(ind->expr);
@@ -146,6 +144,9 @@ void cast_gencode(cast *expr)
     switch (r) {
         case int_t:
             switch (l) {
+                case long_long_t: case unsigned_long_long_t:
+                    buff_add(text_buff, "xor edx, edx\n");
+                    break;
                 default: break;
             }
             break;
@@ -192,6 +193,51 @@ void m_expr_gencode(m_expr *expr)
                 );
             break;
         case long_long_t:
+            gencode(expr->left);
+            buff_add(text_buff,
+                "push eax\n"
+                "push edx\n"
+                "\n"
+                "xor ebx, ebx\n"
+                "test edx, 0x80000000\n"
+                "setz bl\n"
+                "push ebx\n"
+                "\n"
+                );
+            gencode(expr->right);
+            buff_add(text_buff,
+                "xor ecx, ecx\n"
+                "test edx, 0x80000000\n"
+                "setz cl\n"
+                "\n"
+                "pop ebx\n"
+                "xor bl, cl\n"
+                "setz bl\n"
+                "mov esi, ebx\n"
+                "shl esi, 31\n"
+                "or esi, 0x7fffffff\n"
+                "\n"
+                "pop ebx\n" /* hi */
+                "pop ecx\n" /* lo */
+                "\n"
+                "and edx, 0x7fffffff\n"
+                "and ebx, 0x7fffffff\n"
+                "\n"
+                "mov esi, eax\n"
+                "mov eax, edx\n"
+                "mul ecx\n"
+                "mov edi, eax\n"
+                "\n"
+                "mov eax, esi\n"
+                "mul ebx\n"
+                "add edi, eax\n"
+                "\n"
+                "mul ecx\n"
+                "add edx, edi\n"
+                "\n"
+                "or edx, esi\n"
+                "\n"
+                );
             break;
         case unsigned_int_t:
             gencode(expr->left);

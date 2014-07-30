@@ -1,26 +1,3 @@
 section .data:
 section .bss:
 section .text:
-mov eax, 0
-mov ebx, ebp
-sub ebx, eax
-mov eax, ebx
-mov eax, [eax]
-push eax
-mov eax, 1
-push eax
-mov eax, 8
-pop ebx
-imul ebx
-push eax
-mov eax, 2
-pop ebx
-imul ebx
-pop ebx
-add eax, ebx
-push eax
-mov eax, 343
-neg eax
-pop ebx
-mov [ebx], eax
-mov [ebx+4], edx

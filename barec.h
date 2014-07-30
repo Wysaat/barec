@@ -114,13 +114,6 @@ typedef struct string {
     list *type_list;
 } string;
 
-typedef struct struct_ref {
-    int type;
-    void *primary;
-    char *id;
-    list *type_list;
-} struct_ref;
-
 typedef struct posinc {
     int type;
     void *primary;
@@ -197,7 +190,7 @@ char *scan(FILE *stream);
 
 list *parse_specifier(FILE *stream);
 declarator *parse_declarator(FILE *stream);
-void parse_declaration(FILE *stream, list *declaration_list);
+void parse_declaration(FILE *stream, list *declaration_list, int in_struct);
 list *parse_type_name(FILE *stream);
 void *parse_primary(FILE *stream);
 void *parse_postfix(FILE *stream);

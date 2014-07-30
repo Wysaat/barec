@@ -1,13 +1,16 @@
 #include <stdio.h>
+#include <stdlib.h>
 
 int main()
 {
-	long long *a;
-	a + 3;
-	printf("a is %p, a + 3 is %p\n", a, a + 3);
-	*(a + 432);
-	int b;
-	*b;
-
+	int a = 32;
+	int b = 5;
+	static struct x {
+		int m[- - 3];
+		int n[5*7];
+	} s;
+	printf("sizeof(x) is %lu\n", sizeof(struct x));
+	a = 3;
+	printf("sizeof(x) is %lu\n", sizeof(struct x));
 	return 0;
 }

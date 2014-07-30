@@ -2,6 +2,8 @@
 #include <string.h>
 #include "barec.h"
 
+int isize(list *type_list);
+
 int type(void *stmt) {
     return *(int *)stmt;
 }
@@ -89,22 +91,41 @@ indirection *ARRAY_REF(void *primary, void *expr) {
     return INDIRECTION(expr2);
 }
 
-struct_ref *STRUCT_REF(void *primary, char *id) {
-    struct_ref *retptr = (struct_ref *)malloc(sizeof(struct_ref));
-    retptr->type = struct_ref_t;
-    retptr->primary = primary;
-    retptr->id = id;
-
+declaration *STRUCT_REF(void *primary, char *id) {
     list *type_list = get_type_list(primary), *ptr;
     struct_specifier *specifier = type_list->content;
-    for (ptr = specifier->declaration_list->next; ptr; ptr = ptr->next) {
-        if (!strcmp(((declaration *)ptr->content)->id, id)) {
-            retptr->type_list = ((declaration *)ptr->content)->type_list;
+    void *storage = ((declaration *)specifier->declaration_list->next)->storage;
+    switch (storage) {
+        case auto_storage_t: {
+            auto_storage *as = auto_storage_init();
+            as->address = ARITHMETIC(strdup("0"), int_t);
+            for (ptr = specifier->declaration_list->next; ptr; ptr = ptr->next) {
+                declaration *node = ptr->content;
+                if (!strcmp(node->id, id)) {
+                    node->storage = as;
+                    return node;
+                }
+                else
+                    as->address = A_EXPR("+", as->address, SIZE(node->type_list));
+            }
+            break;
+        }
+        case static_storage_t: {
+            static_storage *ss = static_storage_init();
+            ss->address = 0;
+            for (ptr = specifier->declaration_list->next; ptr; ptr = ptr->next) {
+                declaration *node = ptr->content;
+                if (!strcmp(node->id, id) {
+                    node->storage = ss;
+                    return node;
+                }
+                else
+                    ss->address += isize(node->type_list);
+            }
             break;
         }
     }
 
-    return retptr;
 }
 
 posinc *POSINC(void *primary, int inc) {
@@ -179,7 +200,17 @@ void *SIZE(list *type_list)
                 break;
         }
     }
-    return M_EXPR("*", retptr, arith_size(ptr->content));
+    void *last_size;
+    if (type(ptr->content) == arithmetic_specifier_t)
+        last_size = arith_size(ptr->content);
+    else if (type(ptr->content) == struct_specifier_t) {
+        struct_specifier *specifier = ptr->content;
+        last_size = ARITHMETIC(strdup("1"), int_t);
+        list *p;
+        for (p = specifier->declaration_list->next; p; p = p->next)
+            last_size = A_EXPR("+", last_size, SIZE2(p->content));
+    }
+    return M_EXPR("*", retptr, last_size);
 }
 
 void *SIZE2(void *expr)
@@ -280,7 +311,7 @@ arithmetic_specifier *integral_promotion(arithmetic_specifier *s)
 {
     enum atypes atype = s->atype;
     switch (atype) {
-        case unsigned_char_t: case char_t: case unsigned_short_t: case_short_t:
+        case unsigned_char_t: case char_t: case unsigned_short_t: case short_t:
             return arithmetic_specifier_init(int_t);
         default:
             return s;
@@ -303,8 +334,6 @@ list *get_type_list(void *vptr)
             return ((string *)vptr)->type_list;
         case declaration_t:
             return ((declaration *)vptr)->type_list;
-        case struct_ref_t:
-            return ((struct_ref *)vptr)->type_list;
         case posinc_t:
             return ((posinc *)vptr)->type_list;
         case preinc_t:
@@ -337,9 +366,6 @@ void set_type_list(list *type_list, void *vptr)
             break;
         case declaration_t:
             ((declaration *)vptr)->type_list = type_list;
-            break;
-        case struct_ref_t:
-            ((struct_ref *)vptr)->type_list = type_list;
             break;
         case posinc_t:
             ((posinc *)vptr)->type_list = type_list;

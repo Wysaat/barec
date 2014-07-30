@@ -138,7 +138,7 @@ char *scan(FILE *stream) {
 /* in the returned list, first is the storage specifier, the second is the type specifier */
 list *parse_specifier(FILE *stream) {
     char *token;
-    void *storage, *specifier = 0;
+    void *storage = 0, *specifier = 0;
     list *retptr = list_node();
     int sign = 1;
     enum atypes atype = -1;
@@ -180,7 +180,7 @@ list *parse_specifier(FILE *stream) {
                     list *_declaration_list = list_node();
                     while (strcmp((token = scan(stream)), "}")) {
                         unscan(token, stream);
-                        parse_declaration(stream, _declaration_list);
+                        parse_declaration(stream, _declaration_list, 1);
                     }
                     specifier = struct_specifier_init(id, _declaration_list);
                     list_append(struct_s_list, specifier);
@@ -188,7 +188,8 @@ list *parse_specifier(FILE *stream) {
                 else {
                     unscan(token, stream);
                     list *ptr;
-                    for (ptr = struct_s_list; ptr; ptr = ptr->next) {
+                    /* CAUTION: list has an empty head */
+                    for (ptr = struct_s_list->next; ptr; ptr = ptr->next) {
                         struct_specifier *_specifier = ptr->content;
                         if (!strcmp(id, _specifier->id))
                             specifier = _specifier;
@@ -199,7 +200,7 @@ list *parse_specifier(FILE *stream) {
                 list *_declaration_list = list_node();
                 while (strcmp((token = scan(stream)), "}")) {
                     unscan(token, stream);
-                    parse_declaration(stream, _declaration_list);
+                    parse_declaration(stream, _declaration_list, 1);
                 }
                 specifier = struct_specifier_init(0, _declaration_list);
             }
@@ -286,11 +287,56 @@ declarator *parse_declarator(FILE *stream) {
     }
 }
 
-void parse_declaration(FILE *stream, list *declaration_list) {
+static int address_int(void *address) {
+    switch (type(address)) {
+        case arithmetic_t:
+            return atoi(((arithmetic *)address)->value);
+        case unary_t:
+            return (((unary *)adress)->op == "+") ? address_int(((unary *)address)->expr) \
+                         : -address_int(((unary *)address)->expr);
+        case m_expr_t:
+            return address_int(((m_expr *)address)->left) * address_int(((m_expr *)address)->right);
+        case a_expr_t:
+            return address_int(((m_expr *)address)->left) + address_int(((m_expr *)address)->right);
+    }
+}
+
+int isize(list *type_list) {
+    list *ptr;
+    int value = 1;
+    for (ptr = type_list; ptr; ptr = ptr->next) {
+        switch (type(ptr->content)) {
+            case pointer_t:
+                return value * 4;
+            case array_t:
+                value *= address_int(((array *)ptr->content)->size);
+                break;
+        }
+    }
+    switch (type(ptr->content)) {
+        case arithmetic_specifier_t: {
+            arithmetic_specifier *specifier = ptr->content;
+            value *= atoi(specifier->value);
+            break;
+        }
+        case struct_specifier_t: {
+            struct_specifier *specifier = ptr->content;
+            list *p;
+            for (p = specifier->declaration_list->next; p; p = p->next)
+                value += isize(get_type_list(p->content));
+        }
+    }
+    return M_EXPR("*", retptr, last_size);
+}
+
+void parse_declaration(FILE *stream, list *declaration_list, int in_struct) {
     list *specifiers = parse_specifier(stream);
     void *storage = specifiers->next->content;
     void *specifier = specifiers->next->next->content;
-    char *token;
+    char *token = scan(stream);
+    if (!strcmp(token, ";"))
+        return;
+    unscan(token, stream);
     while (1) {
         declarator *dptr = parse_declarator(stream);
         list *type_list = dptr->type_list;
@@ -302,15 +348,42 @@ void parse_declaration(FILE *stream, list *declaration_list) {
         }
         else
             type_list->content = specifier;
+        if (type(specifier == struct_specifier_t)) {
+            list *ptr;
+            struct_specifier *s = specifier;
+            if (type(storage) == auto_storage_t) {
+                for (ptr = s->declaration_list->next; ptr; ptr = ptr->next) {
+                    declaration *d = ptr->content;
+                    d->storage = auto_storage_init();
+                }
+            }
+            else if (type(storage) == static_storage_t) {
+                for (ptr = s->declaration_list->next; ptr; ptr = ptr->next) {
+                    declaration *d = ptr->content;
+                    d->storage = static_storage_init();
+                }
+            }
+        }
         char *id = dptr->id;
         declaration *node;
-        if (type(storage) == auto_storage_t) {
+        if (in_struct) {
+            node = declaration_init(id, a_storage, type_list);
+            list_append(declaration_list, node);
+        }
+        else if (type(storage) == auto_storage_t) {
             auto_storage *a_storage = auto_storage_init();
             a_storage->address = auto_size;
             node = declaration_init(id, a_storage, type_list);
             auto_size = A_EXPR("+", auto_size, SIZE(node->type_list));
+            list_append(declaration_list, node);
         }
-        list_append(declaration_list, node);
+        else if (type(storage) == static_storage_t) {
+            static_storage *s_storage = static_storage_init();
+            s_storage->address = data_size;
+            node = declaration_init(id, s_storage, type_list);
+            data_size += isize(node->type_list);
+            list_append(declaration_list, node);
+        }
 
         token = scan(stream);
         if (!strcmp(token, ","))
@@ -528,9 +601,12 @@ int main(int argc, char **argv)
     struct_s_list = list_node();
     declaration_list = list_node();
 
-    parse_declaration(istream, declaration_list);
-    void *stmt = parse_expression_stmt(istream);
-    gencode(stmt);
+    parse_declaration(istream, declaration_list, 0);
+    parse_declaration(istream, declaration_list, 0);
+    // void *stmt = parse_expression_stmt(istream);
+    // gencode(stmt);
+    // stmt = parse_expression_stmt(istream);
+    // gencode(stmt);
     char *data_section = buff_puts(data_buff);
     char *bss_section = buff_puts(bss_buff);
     char *text_section = buff_puts(text_buff);
