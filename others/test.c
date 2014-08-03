@@ -3,4 +3,7 @@ struct hello {
 	int b;
 	int c;
 };
-auto struct hello x;
+
+
+auto struct hello *x;
+x->c = 32888;

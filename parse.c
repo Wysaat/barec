@@ -94,8 +94,8 @@ indirection *ARRAY_REF(void *primary, void *expr) {
 declaration *STRUCT_REF(void *primary, char *id) {
     list *type_list = get_type_list(primary), *ptr;
     struct_specifier *specifier = type_list->content;
-    void *storage = ((declaration *)specifier->declaration_list->next)->storage;
-    switch (storage) {
+    void *storage = ((declaration *)specifier->declaration_list->next->content)->storage;
+    switch (type(storage)) {
         case auto_storage_t: {
             auto_storage *as = auto_storage_init();
             as->address = ARITHMETIC(strdup("0"), int_t);
@@ -115,7 +115,7 @@ declaration *STRUCT_REF(void *primary, char *id) {
             ss->address = 0;
             for (ptr = specifier->declaration_list->next; ptr; ptr = ptr->next) {
                 declaration *node = ptr->content;
-                if (!strcmp(node->id, id) {
+                if (!strcmp(node->id, id)) {
                     node->storage = ss;
                     return node;
                 }

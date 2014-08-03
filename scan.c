@@ -87,13 +87,45 @@ char *scan(FILE *stream) {
             buffer[1] = 0;
             return buffer;
         }
+        else if (ch == '.') {
+            ch = fgetc(stream);
+            if (ch >= '0' && ch <= '9') {
+                buffer[0] = '.';
+                buffer[1] = ch;
+                i = 2;
+                while (1) {
+                    ch = fgetc(stream);
+                    if (ch >= '0' && ch <= '9')
+                        buffer[i++] = ch;
+                    else {
+                        ungetc(ch, stream);
+                        break;
+                    }
+                }
+                buffer[i] = 0;
+                return buffer;
+            }
+            else {
+                ungetc(ch, stream);
+                buffer[0] = '.';
+                buffer[1] = 0;
+                return buffer;
+            }
+        }
         else if (ch >= '0' && ch <= '9') {
             i = 0;
             buffer[i++] = ch;
+            int point = 0;
             while (1) {
                 ch = fgetc(stream);
                 if (ch >= '0' && ch <= '9')
                     buffer[i++] = ch;
+                else if (ch == '.') {
+                    if (point == 0) {
+                        point = 1;
+                        buffer[i++] = ch;
+                    }
+                }
                 else {
                     ungetc(ch, stream);
                     break;
@@ -236,6 +268,7 @@ declarator *parse_declarator(FILE *stream) {
         token = scan(stream);
         if (!strcmp(token, "*")) {
             type_list->prev = list_init(pointer_init());
+            type_list->prev->next = type_list;
             type_list = type_list->prev;
         }
         else {
@@ -254,6 +287,7 @@ declarator *parse_declarator(FILE *stream) {
             while (ptr->next)
                 ptr = ptr->next;
             ptr->prev->next = type_list;
+            type_list->prev = ptr->prev;
             free(ptr);
             type_list = nlist;
         }
@@ -292,7 +326,7 @@ static int address_int(void *address) {
         case arithmetic_t:
             return atoi(((arithmetic *)address)->value);
         case unary_t:
-            return (((unary *)adress)->op == "+") ? address_int(((unary *)address)->expr) \
+            return (((unary *)address)->op == "+") ? address_int(((unary *)address)->expr) \
                          : -address_int(((unary *)address)->expr);
         case m_expr_t:
             return address_int(((m_expr *)address)->left) * address_int(((m_expr *)address)->right);
@@ -304,7 +338,7 @@ static int address_int(void *address) {
 int isize(list *type_list) {
     list *ptr;
     int value = 1;
-    for (ptr = type_list; ptr; ptr = ptr->next) {
+    for (ptr = type_list; ptr->next; ptr = ptr->next) {
         switch (type(ptr->content)) {
             case pointer_t:
                 return value * 4;
@@ -316,17 +350,23 @@ int isize(list *type_list) {
     switch (type(ptr->content)) {
         case arithmetic_specifier_t: {
             arithmetic_specifier *specifier = ptr->content;
-            value *= atoi(specifier->value);
+            switch (specifier->atype) {
+                case char_t: case unsigned_char_t: return value * 1;
+                case short_t: case unsigned_short_t: return value * 2;
+                case int_t: case unsigned_int_t: return value * 4;
+                case long_long_t: case unsigned_long_long_t: return value * 8;
+            }
             break;
         }
         case struct_specifier_t: {
+            int last_value = 0;
             struct_specifier *specifier = ptr->content;
             list *p;
             for (p = specifier->declaration_list->next; p; p = p->next)
-                value += isize(get_type_list(p->content));
+                last_value += isize(get_type_list(p->content));
+            return value * last_value;
         }
     }
-    return M_EXPR("*", retptr, last_size);
 }
 
 void parse_declaration(FILE *stream, list *declaration_list, int in_struct) {
@@ -348,7 +388,7 @@ void parse_declaration(FILE *stream, list *declaration_list, int in_struct) {
         }
         else
             type_list->content = specifier;
-        if (type(specifier == struct_specifier_t)) {
+        if (type(specifier) == struct_specifier_t) {
             list *ptr;
             struct_specifier *s = specifier;
             if (type(storage) == auto_storage_t) {
@@ -367,7 +407,7 @@ void parse_declaration(FILE *stream, list *declaration_list, int in_struct) {
         char *id = dptr->id;
         declaration *node;
         if (in_struct) {
-            node = declaration_init(id, a_storage, type_list);
+            node = declaration_init(id, 0, type_list);
             list_append(declaration_list, node);
         }
         else if (type(storage) == auto_storage_t) {
@@ -603,8 +643,8 @@ int main(int argc, char **argv)
 
     parse_declaration(istream, declaration_list, 0);
     parse_declaration(istream, declaration_list, 0);
-    // void *stmt = parse_expression_stmt(istream);
-    // gencode(stmt);
+    void *stmt = parse_expression_stmt(istream);
+    gencode(stmt);
     // stmt = parse_expression_stmt(istream);
     // gencode(stmt);
     char *data_section = buff_puts(data_buff);

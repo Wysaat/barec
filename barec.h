@@ -220,7 +220,7 @@ declaration *declaration_init(char *id, void *storage, list *type_list);
 arithmetic *ARITHMETIC(char *value, int atype);
 string *STRING(int address, char *value);
 indirection *ARRAY_REF(void *primary, void *expr);
-struct_ref *STRUCT_REF(void *primary, char *id);
+declaration *STRUCT_REF(void *primary, char *id);
 posinc *POSINC(void *primary, int inc);
 preinc *PREINC(void *expr, int inc);
 addr *ADDR(void *expr);
