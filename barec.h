@@ -12,6 +12,7 @@ void *auto_size;
 int data_size;
 list *struct_s_list;
 list *declaration_list;
+int tab;
 
 enum types {
     auto_storage_t,
@@ -32,12 +33,10 @@ enum types {
     indirection_t,
     unary_t,
     cast_t,
-    m_expr_t,
-    a_expr_t,
+    binary_t,
     assignment_t,
     expression_t,
     expression_stmt_t,
-
     pointer_t,
     array_t,
 };
@@ -57,6 +56,27 @@ enum atypes {
     double_t = 11,         // 8 bytes
     long_double_t = 12,   // 12 bytes
 };
+
+typedef enum btype {
+    mul,
+    divi,
+    mod,
+    add,
+    sub,
+    lshift,
+    rshift,
+    lt,
+    gt,
+    le,
+    ge,
+    eq,
+    neq,
+    band,
+    bxor,
+    bor,
+    land,
+    lor,
+} btype_t;
 
 typedef struct auto_storage {
     int type;
@@ -153,21 +173,13 @@ typedef struct cast {
     struct cast *expr;
 } cast;
 
-typedef struct m_expr {
+typedef struct binary {
     int type;
-    char *op;
+    btype_t btype;
     void *left;
     void *right;
     list *type_list;
-} m_expr;
-
-typedef struct a_expr {
-    int type;
-    char *op;
-    void *left;
-    void *right;
-    list *type_list;
-} a_expr;
+} binary;
 
 typedef struct assignment {
     int type;
@@ -186,10 +198,14 @@ typedef struct expression_stmt {
     list *assignment_list;
 } expression_stmt;
 
+/*
+ * scan.c
+ */
+
 char *scan(FILE *stream);
 
 list *parse_specifier(FILE *stream);
-declarator *parse_declarator(FILE *stream);
+declarator *parse_declarator(FILE *stream, int abstract);
 void parse_declaration(FILE *stream, list *declaration_list, int in_struct);
 list *parse_type_name(FILE *stream);
 void *parse_primary(FILE *stream);
@@ -229,10 +245,8 @@ unary *UNARY(void *expr, char *op);
 void *SIZE(list *type_list);
 void *SIZE2(void *expr);
 cast *CAST(list *type_list, cast *expr);
-m_expr *M_EXPR(char *op, void *expr1, void *expr2);
-a_expr *A_EXPR(char *op, void *expr1, void *expr2);
+binary *BINARY(btype_t btype, void *left, void *right);
 expression *EXPRESSION(list *assignment_list, list *type_list);
-arithmetic_specifier *arithmetic_convertion(arithmetic_specifier *ls, arithmetic_specifier *rs);
 arithmetic_specifier *integral_promotion(arithmetic_specifier *s);
 list *integral_promotion2(list *type_list);
 list *get_type_list(void *vptr);
@@ -249,6 +263,8 @@ void unscan(char *token, FILE *stream);
 int is_id(char *token);
 int is_int(char *token);
 char *itoa(int value);
+
+char *get_tab();
 
 /* the list has an empty head */
 struct list {

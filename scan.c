@@ -259,7 +259,7 @@ list *parse_specifier(FILE *stream) {
     return retptr;
 }
 
-declarator *parse_declarator(FILE *stream) {
+declarator *parse_declarator(FILE *stream, int abstract) {
     char *token;
     list *type_list = list_node(), *tmp;
     char *id = 0;
@@ -277,23 +277,25 @@ declarator *parse_declarator(FILE *stream) {
         }
     }
 
-    token = scan(stream);
-    if (!strcmp(token, "(")) {
-        declarator *dptr = parse_declarator(stream);
-        id = dptr->id;
-        list *nlist = dptr->type_list;
-        if (nlist->next) {
-            list *ptr = nlist;
-            while (ptr->next)
-                ptr = ptr->next;
-            ptr->prev->next = type_list;
-            type_list->prev = ptr->prev;
-            free(ptr);
-            type_list = nlist;
+    if (!abstract) {
+        token = scan(stream);
+        if (!strcmp(token, "(")) {
+            declarator *dptr = parse_declarator(stream, 0);
+            id = dptr->id;
+            list *nlist = dptr->type_list;
+            if (nlist->next) {
+                list *ptr = nlist;
+                while (ptr->next)
+                    ptr = ptr->next;
+                ptr->prev->next = type_list;
+                type_list->prev = ptr->prev;
+                free(ptr);
+                type_list = nlist;
+            }
         }
+        else if (is_id(token))
+            id = token;
     }
-    else if (is_id(token))
-        id = token;
 
     while (1) {
         token = scan(stream);
@@ -328,10 +330,6 @@ static int address_int(void *address) {
         case unary_t:
             return (((unary *)address)->op == "+") ? address_int(((unary *)address)->expr) \
                          : -address_int(((unary *)address)->expr);
-        case m_expr_t:
-            return address_int(((m_expr *)address)->left) * address_int(((m_expr *)address)->right);
-        case a_expr_t:
-            return address_int(((m_expr *)address)->left) + address_int(((m_expr *)address)->right);
     }
 }
 
@@ -378,7 +376,7 @@ void parse_declaration(FILE *stream, list *declaration_list, int in_struct) {
         return;
     unscan(token, stream);
     while (1) {
-        declarator *dptr = parse_declarator(stream);
+        declarator *dptr = parse_declarator(stream, 0);
         list *type_list = dptr->type_list;
         if (type_list->next) {
             list *ptr = type_list;
@@ -414,7 +412,7 @@ void parse_declaration(FILE *stream, list *declaration_list, int in_struct) {
             auto_storage *a_storage = auto_storage_init();
             a_storage->address = auto_size;
             node = declaration_init(id, a_storage, type_list);
-            auto_size = A_EXPR("+", auto_size, SIZE(node->type_list));
+            auto_size = BINARY(add, auto_size, SIZE(node->type_list));
             list_append(declaration_list, node);
         }
         else if (type(storage) == static_storage_t) {
@@ -436,12 +434,12 @@ void parse_declaration(FILE *stream, list *declaration_list, int in_struct) {
 list *parse_type_name(FILE *stream) {
     list *specifiers = parse_specifier(stream);
     void *specifier = specifiers->next->next->content;
-    declarator *dptr = parse_declarator(stream);
+    declarator *dptr = parse_declarator(stream, 1);
     list *type_list = dptr->type_list;
     list *ptr = type_list;
     while (ptr->next)
         ptr = ptr->next;
-    ptr->prev->next = specifier;
+    ptr->content = specifier;
     return type_list;
 }
 
@@ -546,12 +544,82 @@ void *parse_cast(FILE *stream) {
     }
 }
 
+enum types get_type(void *expr)
+{
+    return type(get_type_list(expr)->content);
+}
+
+int type_is_int(void *expr)
+{
+    void *a = get_type_list(expr)->content;
+    if (type(a) == arithmetic_specifier_t) {
+        arithmetic_specifier *s = a;
+        switch (s->atype) {
+            case char_t: case unsigned_char_t:
+            case short_t: case unsigned_short_t:
+            case int_t: case unsigned_int_t:
+            case long_t: case unsigned_long_t:
+            case long_long_t: case unsigned_long_long_t:
+                return 1;
+            default: return 0;
+        }
+    }
+    return 0;
+}
+
+/* arithmetic convertion contains integral promotion */
+void **arithmetic_convertion(void *left, void *right)
+{
+    void **retptr = (void **)malloc(sizeof(void *)*2);
+    enum atypes l = get_type(left), r = get_type(right), res;
+    if (l == long_double_t || r == long_double_t)
+        res = long_double_t;
+    else if (l == double_t || r == double_t)
+        res = double_t;
+    else if (l == float_t || r == float_t)
+        res = float_t;
+    else if (l == unsigned_long_long_t || r == unsigned_long_long_t)
+        res = unsigned_long_long_t;
+    else if (l == long_long_t || r == long_long_t)
+        res = long_long_t;
+    else if (l == unsigned_int_t || r == unsigned_int_t)
+        res = unsigned_int_t;
+    else /* integral promotion */
+        res = int_t;
+    if (l != res) {
+        list *type_list = list_node();
+        type_list->content = arithmetic_specifier_init(res);
+        left = CAST(type_list, left);
+    }
+    if (r != res) {
+        list *type_list = list_node();
+        type_list->content = arithmetic_specifier_init(res);
+        right = CAST(type_list, right);
+    }
+    *retptr = left;
+    *(retptr+1) = right;
+    return retptr;
+}
+
 void *parse_m_expr(FILE *stream) {
     void *expr = parse_cast(stream);
     while (1) {
         char *token = scan(stream);
-        if (!strcmp(token, "*") || !strcmp(token, "/") || !strcmp(token, "%"))
-            expr = M_EXPR(token, expr, parse_cast(stream));
+        if (!strcmp(token, "*") || !strcmp(token, "/")) {
+            btype_t btype = !strcmp(token, "*") ? mul : divi;
+            void *expr2 = parse_cast(stream);
+            if (get_type(expr) == arithmetic_specifier_t && get_type(expr2) == arithmetic_specifier_t) {
+                void **ptr = arithmetic_convertion(expr, expr2);
+                expr = BINARY(btype, *ptr, *(ptr+1));
+            }
+        }
+        else if (!strcmp(token, "%")) {
+            void *expr2 = parse_cast(stream);
+            if (type_is_int(expr) && type_is_int(expr2)) {
+                void **ptr = arithmetic_convertion(expr, expr2);
+                expr = BINARY(mod, *ptr, *(ptr+1));
+            }
+        }
         else {
             unscan(token, stream);
             return expr;
@@ -563,8 +631,165 @@ void *parse_a_expr(FILE *stream) {
     void *expr = parse_m_expr(stream);
     while (1) {
         char *token = scan(stream);
-        if (!strcmp(token, "+")|| !strcmp(token, "-"))
-            expr = A_EXPR(token, expr, parse_m_expr(stream));
+        if (!strcmp(token, "+") || !strcmp(token, "-")) {
+            btype_t btype = !strcmp(token, "+") ? add : sub;
+            void *expr2 = parse_m_expr(stream);
+            if (get_type(expr) == arithmetic_specifier_t && get_type(expr2) == arithmetic_specifier_t) {
+                void **ptr = arithmetic_convertion(expr, expr2);
+                expr = BINARY(btype, *ptr, *(ptr+1));
+            }
+            else if ((get_type(expr) == pointer_t || get_type(expr) == array_t) && type_is_int(expr2))
+                expr = BINARY(btype, expr, BINARY(mul, expr2, SIZE2(INDIRECTION(expr))));
+            else if ((get_type(expr2) == pointer_t || get_type(expr) == array_t) && type_is_int(expr))
+                expr = BINARY(btype, expr2, BINARY(mul, expr, SIZE2(INDIRECTION(expr2))));
+        }
+        else {
+            unscan(token, stream);
+            return expr;
+        }
+    }
+}
+
+void *parse_shift(FILE *stream) {
+    void *expr = parse_a_expr(stream);
+    while (1) {
+        char *token = scan(stream);
+        if (!strcmp(token, "<<") || !strcmp(token, ">>")) {
+            btype_t btype = !strcmp(token, "<<") ? lshift : rshift;
+            void *expr2 = parse_a_expr(stream);
+            if (type_is_int(expr) && type_is_int(expr2)) {
+                set_type_list(expr, integral_promotion2(get_type_list(expr)));
+                set_type_list(expr2, integral_promotion2(get_type_list(expr2)));
+                expr = BINARY(btype, expr, expr2);
+            }
+        }
+        else {
+            unscan(token, stream);
+            return expr;
+        }
+    }
+}
+
+void *parse_relational(FILE *stream) {
+    void *expr = parse_shift(stream);
+    while (1) {
+        char *token = scan(stream);
+        if (!strcmp(token, "<") || !strcmp(token, ">") ||
+                  !strcmp(token, "<=") || !strcmp(token, ">=")) {
+            btype_t btype = !strcmp(token, "<") ? lt :
+                            !strcmp(token, ">") ? gt :
+                            !strcmp(token, "<=") ? le : ge;
+            void *expr2 = parse_shift(stream);
+            if (get_type(expr) == arithmetic_specifier_t && get_type(expr2) == arithmetic_specifier_t) {
+                void **ptr = arithmetic_convertion(expr, expr2);
+                expr = BINARY(btype, *ptr, *(ptr+1));
+            }
+            else if ((get_type(expr) == pointer_t ||get_type(expr) == array_t) &&
+                           (get_type(expr2) == pointer_t || get_type(expr2) == array_t))
+                expr = BINARY(btype, expr, expr2);
+        }
+        else {
+            unscan(token, stream);
+            return expr;
+        }
+    }
+}
+
+void *parse_equality(FILE *stream) {
+    void *expr = parse_relational(stream);
+    while (1) {
+        char *token = scan(stream);
+        if (!strcmp(token, "==") || !strcmp(token, "!=")) {
+            btype_t btype = !strcmp(token, "==") ? eq : neq;
+            void *expr2 = parse_relational(stream);
+            if (get_type(expr) == arithmetic_specifier_t && get_type(expr2) == arithmetic_specifier_t) {
+                void **ptr = arithmetic_convertion(expr, expr2);
+                expr = BINARY(btype, *ptr, *(ptr+1));
+            }
+            else if ((get_type(expr) == pointer_t ||get_type(expr) == array_t) &&
+                           (get_type(expr2) == pointer_t || get_type(expr2) == array_t))
+                expr = BINARY(btype, expr, expr2);
+        }
+        else {
+            unscan(token, stream);
+            return expr;
+        }
+    }
+}
+
+void *parse_and(FILE *stream) {
+    void *expr = parse_equality(stream);
+    while (1) {
+        char *token = scan(stream);
+        if (!strcmp(token, "&")) {
+            void *expr2 = parse_equality(stream);
+            if (type_is_int(expr) && type_is_int(expr2)) {
+                void **ptr = arithmetic_convertion(expr, expr2);
+                expr = BINARY(band, *ptr, *(ptr+1));
+            }
+        }
+        else {
+            unscan(token, stream);
+            return expr;
+        }
+    }
+}
+
+void *parse_xor(FILE *stream) {
+    void *expr = parse_and(stream);
+    while (1) {
+        char *token = scan(stream);
+        if (!strcmp(token, "^")) {
+            void *expr2 = parse_and(stream);
+            if (type_is_int(expr) && type_is_int(expr2)) {
+                void **ptr = arithmetic_convertion(expr, expr2);
+                expr = BINARY(bxor, *ptr, *(ptr+1));
+            }
+        }
+        else {
+            unscan(token, stream);
+            return expr;
+        }
+    }
+}
+
+void *parse_or(FILE *stream) {
+    void *expr = parse_xor(stream);
+    while (1) {
+        char *token = scan(stream);
+        if (!strcmp(token, "|")) {
+            void *expr2 = parse_xor(stream);
+            if (type_is_int(expr) && type_is_int(expr2)) {
+                void **ptr = arithmetic_convertion(expr, expr2);
+                expr = BINARY(bor, *ptr, *(ptr+1));
+            }
+        }
+        else {
+            unscan(token, stream);
+            return expr;
+        }
+    }
+}
+
+void *parse_logical_and(FILE *stream) {
+    void *expr = parse_or(stream);
+    while (1) {
+        char *token = scan(stream);
+        if (!strcmp(token, "&&"))
+            expr = BINARY(land, expr, parse_or(stream));
+        else {
+            unscan(token, stream);
+            return expr;
+        }
+    }
+}
+
+void *parse_logical_or(FILE *stream) {
+    void *expr = parse_logical_and(stream);
+    while (1) {
+        char *token = scan(stream);
+        if (!strcmp(token, "||"))
+            expr = BINARY(lor, expr, parse_logical_and(stream));
         else {
             unscan(token, stream);
             return expr;
@@ -573,7 +798,7 @@ void *parse_a_expr(FILE *stream) {
 }
 
 void *parse_conditional(FILE *stream) {
-    return parse_a_expr(stream);
+    return parse_logical_or(stream);
 }
 
 void *parse_assignment(FILE *stream) {
@@ -640,13 +865,11 @@ int main(int argc, char **argv)
     data_size = 0;
     struct_s_list = list_node();
     declaration_list = list_node();
+    tab = 0;
 
-    parse_declaration(istream, declaration_list, 0);
     parse_declaration(istream, declaration_list, 0);
     void *stmt = parse_expression_stmt(istream);
     gencode(stmt);
-    // stmt = parse_expression_stmt(istream);
-    // gencode(stmt);
     char *data_section = buff_puts(data_buff);
     char *bss_section = buff_puts(bss_buff);
     char *text_section = buff_puts(text_buff);

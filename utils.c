@@ -135,3 +135,13 @@ char *buff_puts(buffer *buff) {
     retptr[len] = 0;
     return retptr;
 }
+
+char *get_tab()
+{
+    char *t = itoa(tab++);
+    char *retptr = (char *)malloc(strlen(t) + 1 + 1);
+    *retptr = 't';
+    strcpy(retptr+1, t);
+    retptr[strlen(t)+2] = 0;
+    return retptr;
+}

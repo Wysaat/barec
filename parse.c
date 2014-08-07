@@ -87,7 +87,7 @@ string *STRING(int address, char *value) {
 }
 
 indirection *ARRAY_REF(void *primary, void *expr) {
-    void *expr2 = A_EXPR("+", primary, expr);
+    void *expr2 = BINARY(add, primary, expr);
     return INDIRECTION(expr2);
 }
 
@@ -106,7 +106,7 @@ declaration *STRUCT_REF(void *primary, char *id) {
                     return node;
                 }
                 else
-                    as->address = A_EXPR("+", as->address, SIZE(node->type_list));
+                    as->address = BINARY(add, as->address, SIZE(node->type_list));
             }
             break;
         }
@@ -194,10 +194,10 @@ void *SIZE(list *type_list)
     for (ptr = type_list; ptr->next; ptr = ptr->next) {
         switch (type(ptr->content)) {
             case pointer_t:
-                return M_EXPR("*", retptr, ARITHMETIC(strdup("4"), int_t));
+                return BINARY(mul, retptr, ARITHMETIC(strdup("4"), int_t));
             case array_t:
-                retptr = M_EXPR("*", retptr, ((array *)ptr->content)->size);
-                break;
+                return BINARY(mul, retptr, ((array *)ptr->content)->size);
+            break;
         }
     }
     void *last_size;
@@ -208,9 +208,9 @@ void *SIZE(list *type_list)
         last_size = ARITHMETIC(strdup("1"), int_t);
         list *p;
         for (p = specifier->declaration_list->next; p; p = p->next)
-            last_size = A_EXPR("+", last_size, SIZE2(p->content));
+            last_size = BINARY(add, last_size, SIZE2(p->content));
     }
-    return M_EXPR("*", retptr, last_size);
+    return BINARY(mul, retptr, last_size);
 }
 
 void *SIZE2(void *expr)
@@ -227,54 +227,23 @@ cast *CAST(list *type_list, cast *expr)
     return retptr;
 }
 
-m_expr *M_EXPR(char *op, void *expr1, void *expr2)
+binary *BINARY(btype_t btype, void *left, void *right)
 {
-    m_expr *retptr = (m_expr *)malloc(sizeof(m_expr));
-    retptr->type = m_expr_t;
-    retptr->op = op;
-    retptr->left = expr1;
-    retptr->right = expr2;
-    retptr->type_list = list_node();
-    arithmetic_specifier *lspecifier = get_type_list(expr1)->content;
-    arithmetic_specifier *rspecifier = get_type_list(expr2)->content;
-    arithmetic_specifier *specifier  = arithmetic_convertion(lspecifier, rspecifier);
-    retptr->type_list->content = specifier;
-    if (lspecifier != specifier)
-        retptr->left = CAST(retptr->type_list, expr1);
-    if (rspecifier != specifier)
-        retptr->right = CAST(retptr->type_list, expr2);
-    return retptr;
-}
-
-a_expr *A_EXPR(char *op, void *expr1, void *expr2)
-{
-    a_expr *retptr = (a_expr *)malloc(sizeof(a_expr));
-    retptr->type = a_expr_t;
-    retptr->op = op;
-    retptr->left = expr1;
-    retptr->right = expr2;
-    retptr->type_list = list_node();
-    list *ltype_list = get_type_list(expr1);
-    list *rtype_list = get_type_list(expr2);
-    list *int_type_list = list_init(arithmetic_specifier_init(int_t));
-    if (type(ltype_list->content) == pointer_t || type(ltype_list->content) == array_t) {
-        a_expr *retptr = A_EXPR("+", CAST(int_type_list, expr1), M_EXPR("*", SIZE2(INDIRECTION(expr1)), expr2));
-        retptr->type_list = ltype_list;
-        return retptr;
+    binary *retptr = (binary *)malloc(sizeof(binary));
+    retptr->type = binary_t;
+    retptr->btype = btype;
+    retptr->left = left;
+    retptr->right = right;
+    switch (btype) {
+        case mul: case divi: case mod: case add: case sub:
+        case lshift: case rshift: case band: case bxor: case bor:
+            retptr->type_list = get_type_list(left);
+            break;
+        default:
+            retptr->type_list = list_node();
+            retptr->type_list->content = arithmetic_specifier_init(int_t);
+            break;
     }
-    if (type(rtype_list->content) == pointer_t || type(rtype_list->content) == array_t) {
-        a_expr *retptr = A_EXPR("+", CAST(int_type_list, expr2), M_EXPR("*", SIZE2(INDIRECTION(expr2)), expr1));
-        retptr->type_list = rtype_list;
-        return retptr;
-    }
-    arithmetic_specifier *lspecifier = get_type_list(expr1)->content;
-    arithmetic_specifier *rspecifier = get_type_list(expr2)->content;
-    arithmetic_specifier *specifier  = arithmetic_convertion(lspecifier, rspecifier);
-    retptr->type_list->content = specifier;
-    if (lspecifier != specifier)
-        retptr->left = CAST(retptr->type_list, expr1);
-    if (rspecifier != specifier)
-        retptr->right = CAST(retptr->type_list, expr2);
     return retptr;
 }
 
@@ -285,26 +254,6 @@ expression *EXPRESSION(list *assignment_list, list *type_list)
     retptr->assignment_list = assignment_list;
     retptr->type_list = type_list;
     return retptr;
-}
-
-arithmetic_specifier *arithmetic_convertion(arithmetic_specifier *ls, arithmetic_specifier *rs)
-{
-    enum atypes left = ls->atype, right = rs->atype, res;
-    if (left == long_double_t || right == long_double_t)
-        res = long_double_t;
-    else if (left == double_t || right == double_t)
-        res = double_t;
-    else if (left == float_t || right == float_t)
-        res = float_t;
-    else if (left == unsigned_long_long_t || right == unsigned_long_long_t)
-        res = unsigned_long_long_t;
-    else if (left == long_long_t || right == long_long_t)
-        res = long_long_t;
-    else if (left == unsigned_int_t || right == unsigned_int_t)
-        res = unsigned_int_t;
-    else /* integral promotion */
-        res = int_t;
-    return arithmetic_specifier_init(res);
 }
 
 arithmetic_specifier *integral_promotion(arithmetic_specifier *s)
@@ -346,10 +295,8 @@ list *get_type_list(void *vptr)
             return ((unary *)vptr)->type_list;
         case cast_t:
             return ((cast *)vptr)->type_list;
-        case m_expr_t:
-            return ((m_expr *)vptr)->type_list;
-        case a_expr_t:
-            return ((a_expr *)vptr)->type_list;
+        case binary_t:
+            return ((binary *)vptr)->type_list;
         case expression_t:
             return ((expression *)vptr)->type_list;
     }
@@ -385,11 +332,8 @@ void set_type_list(list *type_list, void *vptr)
         case cast_t:
             ((cast *)vptr)->type_list = type_list;
             break;
-        case m_expr_t:
-            ((m_expr *)vptr)->type_list = type_list;
-            break;
-        case a_expr_t:
-            ((a_expr *)vptr)->type_list = type_list;
+        case binary_t:
+            ((binary *)vptr)->type_list = type_list;
             break;
         case expression_t:
             ((expression *)vptr)->type_list = type_list;
