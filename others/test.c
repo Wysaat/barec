@@ -1,2 +1,6 @@
-char auto x;
-x = (char)3;
+int f(int x, int y);
+
+int f(int x, int y)
+{
+	return 3;
+}

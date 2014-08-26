@@ -145,3 +145,29 @@ char *get_tab()
     retptr[strlen(t)+2] = 0;
     return retptr;
 }
+
+static char *type_specifiers[] = {
+    "void", "char", "short", "int", "long", "float", "double", "signed", "unsigend", 0
+};
+
+int is_specifier(char *token)
+{
+    char **ptr;
+    for (ptr = type_specifiers; *ptr; ptr++)
+        if (!strcmp(token, *ptr))
+            return 1;
+    if (!strcmp(token, "struct") || !strcmp(token, "union") || !strcmp(token, "enum"))
+        return 1;
+    return 0;
+}
+
+inline int is_storage(char *token)
+{
+    return !strcmp(token, "auto") || !strcmp(token, "register") || !strcmp(token, "static")
+                 || !strcmp(token, "extern") || !strcmp(token, "typedef");
+}
+
+inline int is_qualifier(char *token)
+{
+    return !strcmp(token, "const") || !strcmp(token, "volatile");
+}

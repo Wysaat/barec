@@ -50,6 +50,13 @@ array *array_init(void *size) {
     return retptr;
 }
 
+function *function_init(list *parameter_list) {
+    function *retptr = (function *)malloc(sizeof(function));
+    retptr->type = function_t;
+    retptr->parameter_list = parameter_list;
+    return retptr;
+}
+
 declarator *declartor_init(char *id, list *type_list) {
     declarator *retptr = (declarator *)malloc(sizeof(declarator));
     retptr->type = declarator_t;
@@ -62,6 +69,14 @@ declaration *declaration_init(char *id, void *storage, list *type_list) {
     declaration *retptr = (declaration *)malloc(sizeof(declaration));
     retptr->type = declaration_t;
     retptr->id = id;
+    retptr->storage = storage;
+    retptr->type_list = type_list;
+    return retptr;
+}
+
+parameter *parameter_init(void *storage, list *type_list) {
+    parameter *retptr = (parameter *)malloc(sizeof(parameter));
+    retptr->type = parameter_t;
     retptr->storage = storage;
     retptr->type_list = type_list;
     return retptr;
@@ -253,6 +268,22 @@ expression *EXPRESSION(list *assignment_list, list *type_list)
     retptr->type = expression_t;
     retptr->assignment_list = assignment_list;
     retptr->type_list = type_list;
+    return retptr;
+}
+
+expression_stmt *EXPRESSION_STMT(list *assignment_list)
+{
+    expression_stmt *retptr = (expression_stmt *)malloc(sizeof(expression_stmt));
+    retptr->type = expression_stmt_t;
+    retptr->assignment_list = assignment_list;
+    return retptr;
+}
+
+compound_stmt *COMPOUND_STMT(list *statement_list)
+{
+    compound_stmt *retptr = (compound_stmt *)malloc(sizeof(compound_stmt));
+    retptr->type = compound_stmt_t;
+    retptr->statement_list = statement_list;
     return retptr;
 }
 

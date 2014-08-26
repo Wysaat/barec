@@ -10,8 +10,7 @@ buffer *data_buff, *bss_buff, *text_buff;
 
 void *auto_size;
 int data_size;
-list *struct_s_list;
-list *declaration_list;
+struct namespace *namespace;
 int tab;
 
 enum types {
@@ -20,6 +19,10 @@ enum types {
     extern_storage_t,
     arithmetic_specifier_t,
     struct_specifier_t,
+    pointer_t,
+    array_t,
+    function_t,
+    parameter_t,
     declarator_t,
     id_declarator_t,
     array_declarator_t,
@@ -37,8 +40,7 @@ enum types {
     assignment_t,
     expression_t,
     expression_stmt_t,
-    pointer_t,
-    array_t,
+    compound_stmt_t,
 };
 
 enum atypes {
@@ -56,6 +58,12 @@ enum atypes {
     double_t = 11,         // 8 bytes
     long_double_t = 12,   // 12 bytes
 };
+
+typedef struct namespace {
+    list *struct_s_list;
+    list *declaration_list;
+    struct namespace *outer;
+} namespace_t;
 
 typedef enum btype {
     mul,
@@ -108,6 +116,11 @@ typedef struct array {
     void *size;
 } array;
 
+typedef struct function {
+    int type;
+    list *parameter_list;
+} function;
+
 typedef struct declarator {
     int type;
     char *id;
@@ -120,6 +133,12 @@ typedef struct declaration {
     void *storage;
     list *type_list;
 } declaration;
+
+typedef struct parameter {
+    int type;
+    void *storage;
+    list *type_list;
+} parameter;
 
 typedef struct arithmetic {
     int type;
@@ -198,26 +217,40 @@ typedef struct expression_stmt {
     list *assignment_list;
 } expression_stmt;
 
+typedef struct compound_stmt {
+    int type;
+    list *statement_list;
+} compound_stmt;
+
+typedef struct function_definition {
+    int type;
+    list *type_list;
+    compound_stmt *body;
+} function_definition_t;
+
 /*
  * scan.c
  */
 
 char *scan(FILE *stream);
 
-list *parse_specifier(FILE *stream);
-declarator *parse_declarator(FILE *stream, int abstract);
-void parse_declaration(FILE *stream, list *declaration_list, int in_struct);
-list *parse_type_name(FILE *stream);
-void *parse_primary(FILE *stream);
-void *parse_postfix(FILE *stream);
-void *parse_unary(FILE *stream);
-void *parse_cast(FILE *stream);
-void *parse_m_expr(FILE *stream);
-void *parse_a_expr(FILE *stream);
-void *parse_conditional(FILE *stream);
-void *parse_assignment(FILE *stream);
-void *parse_expression(FILE *stream);
-void *pares_expression_stmt(FILE *stream);
+list *parse_specifier(FILE *stream, struct namespace *namespace);
+declarator *parse_declarator(FILE *stream, int abstract, struct namespace *namespace);
+void *parse_declaration(FILE *stream, struct namespace *namespace, int in_struct);
+list *parse_type_name(FILE *stream, struct namespace *namespace);
+void *parse_primary(FILE *stream, namespace_t *namespace);
+void *parse_postfix(FILE *stream, namespace_t *namespace);
+void *parse_unary(FILE *stream, namespace_t *namespace);
+void *parse_cast(FILE *stream, namespace_t *namespace);
+void *parse_m_expr(FILE *stream, namespace_t *namespace);
+void *parse_a_expr(FILE *stream, namespace_t *namespace);
+void *parse_conditional(FILE *stream, namespace_t *namespace);
+void *parse_assignment(FILE *stream, namespace_t *namespace);
+void *parse_expression(FILE *stream, namespace_t *namespace);
+void *pares_expression_stmt(FILE *stream, namespace_t *namespace);
+void *parse_statement(FILE *stream, struct namespace *namespace);
+void *parse_declaration_or_statement(FILE *stream, struct namespace *namespace);
+void *parse_compound_stmt(FILE *stream, struct namespace *namespace);
 
 /*
  * parse.c
@@ -231,8 +264,10 @@ arithmetic_specifier *arithmetic_specifier_init(int atype);
 struct_specifier *struct_specifier_init(char *id, list *declaration_list);
 pointer *pointer_init();
 array *array_init(void *size);
+function *function_init(list *parameter_list);
 declarator *declartor_init(char *id, list *type_list);
 declaration *declaration_init(char *id, void *storage, list *type_list);
+parameter *parameter_init(void *storage, list *type_list);
 arithmetic *ARITHMETIC(char *value, int atype);
 string *STRING(int address, char *value);
 indirection *ARRAY_REF(void *primary, void *expr);
@@ -247,6 +282,8 @@ void *SIZE2(void *expr);
 cast *CAST(list *type_list, cast *expr);
 binary *BINARY(btype_t btype, void *left, void *right);
 expression *EXPRESSION(list *assignment_list, list *type_list);
+expression_stmt *EXPRESSION_STMT(list *assignment_list);
+compound_stmt *COMPOUND_STMT(list *declaration_statement_list);
 arithmetic_specifier *integral_promotion(arithmetic_specifier *s);
 list *integral_promotion2(list *type_list);
 list *get_type_list(void *vptr);
@@ -288,6 +325,9 @@ buffer *buff_init();
 void buff_add(buffer *buff, char *string);
 void buff_addln(buffer *buff, char *string);
 char *buff_puts(buffer *buff);
+int is_specifier(char *token);
+inline int is_storage(char *token);
+inline int is_qualifier(char *token);
 
 /*
  * gencode.c

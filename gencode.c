@@ -591,10 +591,17 @@ void expression_gencode(expression *expr)
         gencode(ptr->content);
 }
 
-void expression_stmt_gencode(expression *expr)
+void expression_stmt_gencode(expression_stmt *expr)
 {
     list *ptr;
     for (ptr = expr->assignment_list->next; ptr; ptr = ptr->next)
+        gencode(ptr->content);
+}
+
+void compound_stmt_gencode(compound_stmt *expr)
+{
+    list *ptr;
+    for (ptr = expr->statement_list->next; ptr; ptr = ptr->next)
         gencode(ptr->content);
 }
 
@@ -614,5 +621,6 @@ void gencode(void *expr)
         case assignment_t: assignment_gencode(expr); break;
         case expression_t: expression_gencode(expr); break;
         case expression_stmt_t: expression_stmt_gencode(expr); break;
+        case compound_stmt_t: compound_stmt_gencode(expr); break;
     }
 }
