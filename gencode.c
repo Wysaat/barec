@@ -75,6 +75,12 @@ void addr_gencode(addr *expr)
                 "mov eax, ebx\n"
                 );
         }
+        else if (type(node->storage) == parameter_storage_t) {
+            parameter_storage *storage = node->storage;
+            buff_add(text_buff, "lea eax, [ebp+");
+            buff_add(text_buff, itoa(4+storage->address));
+            buff_add(text_buff, "]\n");
+        }
     }
     else if (type(expr->expr) == string_t) {
         string_gencode(expr->expr);
@@ -623,4 +629,18 @@ void gencode(void *expr)
         case expression_stmt_t: expression_stmt_gencode(expr); break;
         case compound_stmt_t: compound_stmt_gencode(expr); break;
     }
+}
+
+void function_definition_gencode(function_definition_t *function_definition)
+{
+    buff_add(text_buff, "function_");
+    buff_add(text_buff, function_definition->id);
+    buff_add(text_buff, ":\n");
+    buff_add(text_buff,
+        "push ebp\n"
+        "mov ebp, esp\n"
+        );
+    gencode(function_definition->body->namespace->auto_size);
+    buff_add(text_buff, "sub esp, eax\n");
+    compound_stmt_gencode(function_definition->body);
 }

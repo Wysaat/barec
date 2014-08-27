@@ -200,6 +200,7 @@ static struct namespace *namespace_init(struct namespace *outer)
     struct namespace *retptr = (struct namespace *)malloc(sizeof(struct namespace));
     retptr->declaration_list = list_node();
     retptr->struct_s_list = list_node();
+    retptr->auto_size = ARITHMETIC(strdup("0"), int_t);
     retptr->outer = outer;
     return retptr;
 }
@@ -291,26 +292,64 @@ list *parse_specifier(FILE *stream, struct namespace *namespace) {
     return retptr;
 }
 
-list *parse_parameter_list(FILE *stream, struct namespace *namespace) {
+parameter_storage *parameter_storage_init()
+{
+    parameter_storage *retptr = (parameter_storage *)malloc(sizeof(parameter_storage));
+    retptr->type = parameter_storage_t;
+    return retptr;
+}
+
+list *parse_parameter_list(FILE *stream, struct namespace *namespace, int id_must)
+{
     list *retptr = list_node();
+    int abstract = id_must ? 0 : 2;
+    int size = 0;
+    char *token = scan(stream);
+    unscan(token, stream);
+    if (!strcmp(token, ")"))
+        return retptr;
     while (1) {
-        char *token = scan(stream);
-        if (!strcmp(token, ")"))
-            return retptr;
-        unscan(token, stream);
         list *specifiers = parse_specifier(stream, namespace);
         void *storage = specifiers->next->content;
         void *specifier = specifiers->next->next->content;
-        declarator *d = parse_declarator(stream, 2, namespace);
+        declarator *d = parse_declarator(stream, abstract, namespace, 0);
         list *type_list = d->type_list, *ptr = type_list;
+        char *id = d->id;
         while (ptr->next)
             ptr = ptr->next;
         ptr->content = specifier;
-        list_append(retptr, parameter_init(storage, type_list));
+        if (id_must) {  // is function definition
+            parameter_storage *p_storage = parameter_storage_init();
+            p_storage->address = size;
+            switch (type(type_list->content)) {
+                case array_t: case function_t: case pointer_t: size += 4; break;
+                case arithmetic_specifier_t:
+                    switch (((arithmetic_specifier *)type_list->content)->atype) {
+                        case char_t: case unsigned_char_t: case short_t: case unsigned_short_t:
+                        case int_t: case unsigned_int_t: case long_t: case unsigned_long_t:
+                            size += 4; break;
+                        case long_long_t: case unsigned_long_long_t:
+                            size += 8; break;
+                    }
+                    break;
+            }
+            storage = p_storage;
+        }
+        list_append(retptr, declaration_init(id, storage, type_list));
+        token = scan(stream);
+        if (!strcmp(token, ")")) {
+            unscan(token, stream);
+            return retptr;
+        }
     }
 }
 
-declarator *parse_declarator(FILE *stream, int abstract, struct namespace *namespace)
+/* 
+ * abstract == 0 : id
+ * abstract == 1 : no id
+ * abstract == 2 : id or no id
+ */
+declarator *parse_declarator(FILE *stream, int abstract, struct namespace *namespace, int is_funcdef)
 {
     char *token;
     list *type_list = list_node(), *tmp;
@@ -331,7 +370,7 @@ declarator *parse_declarator(FILE *stream, int abstract, struct namespace *names
 
     token = scan(stream);
     if (!strcmp(token, "(")) {
-        declarator *dptr = parse_declarator(stream, abstract, namespace);
+        declarator *dptr = parse_declarator(stream, abstract, namespace, 0);
         token = scan(stream); // token be ")" else error
         id = dptr->id;
         list *nlist = dptr->type_list;
@@ -360,6 +399,7 @@ declarator *parse_declarator(FILE *stream, int abstract, struct namespace *names
         }
     }
 
+    int id_must = is_funcdef ? 1 : 0;  // whether parameters need an id
     while (1) {
         token = scan(stream);
         if (!strcmp(token, "[")) {
@@ -380,7 +420,7 @@ declarator *parse_declarator(FILE *stream, int abstract, struct namespace *names
             }
         }
         else if (!strcmp(token, "(")) {
-            type_list->prev = list_init(function_init(parse_parameter_list(stream, namespace)));
+            type_list->prev = list_init(function_init(parse_parameter_list(stream, namespace, id_must)));
             tmp = type_list;
             type_list = type_list->prev;
             type_list->next = tmp;
@@ -439,7 +479,8 @@ int isize(list *type_list)
     }
 }
 
-void *parse_declaration(FILE *stream, struct namespace *namespace, int in_struct) {
+void *parse_declaration(FILE *stream, namespace_t *namespace, int in_struct)
+{
     list *specifiers = parse_specifier(stream, namespace);
     void *storage = specifiers->next->content;
     void *specifier = specifiers->next->next->content;
@@ -448,16 +489,12 @@ void *parse_declaration(FILE *stream, struct namespace *namespace, int in_struct
         return 0;
     unscan(token, stream);
     while (1) {
-        declarator *dptr = parse_declarator(stream, 0, namespace);
+        declarator *dptr = parse_declarator(stream, 0, namespace, 0);
         list *type_list = dptr->type_list;
-        if (type_list->next) {
-            list *ptr = type_list;
-            while (ptr->next)
-                ptr = ptr->next;
-            ptr->prev->next->content = specifier;
-        }
-        else
-            type_list->content = specifier;
+        list *ptr = type_list;
+        while (ptr->next)
+            ptr = ptr->next;
+        ptr->content = specifier;
         if (type(specifier) == struct_specifier_t) {
             list *ptr;
             struct_specifier *s = specifier;
@@ -482,9 +519,9 @@ void *parse_declaration(FILE *stream, struct namespace *namespace, int in_struct
         }
         else if (type(storage) == auto_storage_t) {
             auto_storage *a_storage = auto_storage_init();
-            a_storage->address = auto_size;
+            a_storage->address = namespace->auto_size;
             node = declaration_init(id, a_storage, type_list);
-            auto_size = BINARY(add, auto_size, SIZE(node->type_list));
+            namespace->auto_size = BINARY(add, namespace->auto_size, SIZE(node->type_list));
             list_append(namespace->declaration_list, node);
         }
         else if (type(storage) == static_storage_t) {
@@ -503,10 +540,11 @@ void *parse_declaration(FILE *stream, struct namespace *namespace, int in_struct
     }
 }
 
-list *parse_type_name(FILE *stream, struct namespace *namespace) {
+list *parse_type_name(FILE *stream, struct namespace *namespace)
+{
     list *specifiers = parse_specifier(stream, namespace);
     void *specifier = specifiers->next->next->content;
-    declarator *dptr = parse_declarator(stream, 1, namespace);
+    declarator *dptr = parse_declarator(stream, 1, namespace, 0);
     list *type_list = dptr->type_list;
     list *ptr = type_list;
     while (ptr->next)
@@ -515,7 +553,8 @@ list *parse_type_name(FILE *stream, struct namespace *namespace) {
     return type_list;
 }
 
-void *parse_primary(FILE *stream, namespace_t *namespace) {
+void *parse_primary(FILE *stream, namespace_t *namespace)
+{
     char *token = scan(stream);
     if (is_int(token))
         return ARITHMETIC(token, int_t);
@@ -530,11 +569,15 @@ void *parse_primary(FILE *stream, namespace_t *namespace) {
         data_size += strlen(value)+1;
         return retptr;
     }
-    else if (is_id(token))
-        return find_declaration(namespace, token);
+    else if (is_id(token)) {
+        declaration *d = find_declaration(namespace, token);
+        if (d)
+            return d;
+    }
 }
 
-void *parse_postfix(FILE *stream, namespace_t *namespace) {
+void *parse_postfix(FILE *stream, namespace_t *namespace)
+{
     void *primary = parse_primary(stream, namespace);
     char *token;
     while (1) {
@@ -567,7 +610,8 @@ void *parse_postfix(FILE *stream, namespace_t *namespace) {
     }
 }
 
-void *parse_unary(FILE *stream, namespace_t *namespace) {
+void *parse_unary(FILE *stream, namespace_t *namespace)
+{
     char *token = scan(stream);
     if (!strcmp(token, "++"))
         return PREINC(parse_unary(stream, namespace), 1);
@@ -596,7 +640,8 @@ void *parse_unary(FILE *stream, namespace_t *namespace) {
     }
 }
 
-void *parse_cast(FILE *stream, namespace_t *namespace) {
+void *parse_cast(FILE *stream, namespace_t *namespace)
+{
     char *token = scan(stream);
     if (!strcmp(token, "(")) {
         list *type_list = parse_type_name(stream, namespace);
@@ -914,7 +959,7 @@ void *parse_statement(FILE *stream, struct namespace *namespace)
     char *token = scan(stream);
     unscan(token, stream);
     if (!strcmp(token, "{"))
-        return parse_compound_stmt(stream, namespace);
+        return parse_compound_stmt(stream, namespace, 0);
     else
         return parse_expression_stmt(stream, namespace);
 }
@@ -928,14 +973,18 @@ void *parse_declaration_or_statement(FILE *stream, namespace_t *namespace)
     return parse_statement(stream, namespace);
 }
 
-void *parse_compound_stmt(FILE *stream, namespace_t *namespace)
+void *parse_compound_stmt(FILE *stream, namespace_t *namespace, list *parameter_list)
 {
+    char *token = scan(stream);
+    if (strcmp(token, "{")) /* error */;
     struct namespace *i_namespace = namespace_init(namespace);
+    if (parameter_list)
+        i_namespace->declaration_list = parameter_list;
     list *statement_list = list_node();
     while (1) {
-        char *token = scan(stream);
+        token = scan(stream);
         if (!strcmp(token, "}"))
-            return COMPOUND_STMT(statement_list);
+            return COMPOUND_STMT(statement_list, i_namespace);
         unscan(token, stream);
         void *statement = parse_declaration_or_statement(stream, i_namespace);
         if (statement)
@@ -943,8 +992,45 @@ void *parse_compound_stmt(FILE *stream, namespace_t *namespace)
     }
 }
 
-void *parse_function_definition(FILE *stream, namespace_t *namespace)
+static function_definition_t *function_definition_init(char *id, list *return_type_list, list *parameter_list, compound_stmt *body)
 {
+    function_definition_t *retptr = (function_definition_t *)malloc(sizeof(function_definition_t));
+    retptr->id = id;
+    retptr->return_type_list = return_type_list;
+    retptr->parameter_list = parameter_list;
+    retptr->body = body;
+    return retptr;
+}
+
+static inline list *list_copy(list *head)
+{
+    list *retptr = list_node(), *ptr, *ptr2 = retptr;
+    for (ptr = head->next; ptr; ptr = ptr->next) {
+        ptr2->next = list_node();
+        ptr2->next->prev = ptr2;
+        ptr2->next->content = ptr->content;
+        ptr2 = ptr2->next;
+    }
+    return retptr;
+}
+
+function_definition_t *parse_function_definition(FILE *stream, namespace_t *namespace)
+{
+    list *specifiers = parse_specifier(stream, namespace);
+    void *storage = specifiers->next->content;
+    void *specifier = specifiers->next->next->content;
+    declarator *dcl = parse_declarator(stream, 0, namespace, 1);
+    char *id = dcl->id;
+    list *type_list = dcl->type_list;
+    list *ptr = type_list;
+    while (ptr->next)
+        ptr = ptr->next;
+    ptr->content = specifier;
+    list *parameter_list = ((function *)type_list->content)->parameter_list;
+    list *return_type_list = type_list->next;
+    return_type_list->prev = 0;
+    compound_stmt *body = parse_compound_stmt(stream, namespace, list_copy(parameter_list));
+    return function_definition_init(id, return_type_list, parameter_list, body);
 }
 
 int main(int argc, char **argv)
@@ -961,14 +1047,12 @@ int main(int argc, char **argv)
     data_buff = buff_init();
     bss_buff = buff_init();
     text_buff = buff_init();
-    auto_size = ARITHMETIC(strdup("0"), int_t);
     data_size = 0;
     namespace = namespace_init(0);
     tab = 0;
 
-    parse_declaration(istream, namespace, 0);
-    void *stmt = parse_expression_stmt(istream, namespace);
-    gencode(stmt);
+    function_definition_t *function_definition = parse_function_definition(istream, namespace);
+    function_definition_gencode(function_definition);
     char *data_section = buff_puts(data_buff);
     char *bss_section = buff_puts(bss_buff);
     char *text_section = buff_puts(text_buff);

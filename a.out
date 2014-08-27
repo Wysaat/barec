@@ -1,10 +1,23 @@
 section .data:
 section .bss:
 section .text:
-mov eax, 0
-mov ebx, ebp
-sub ebx, eax
-mov eax, ebx
+function_f:
+push ebp
+mov ebp, esp
+mov eax, 1
 push eax
+mov eax, 4
 pop ebx
-mov [ebx], al
+imul ebx
+push eax
+mov eax, 0
+pop ebx
+add eax, ebx
+sub esp, eax
+lea eax, [ebp+8]
+mov eax, [eax]
+push eax
+lea eax, [ebp+4]
+mov eax, [eax]
+pop ebx
+add eax, ebx

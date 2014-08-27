@@ -279,11 +279,12 @@ expression_stmt *EXPRESSION_STMT(list *assignment_list)
     return retptr;
 }
 
-compound_stmt *COMPOUND_STMT(list *statement_list)
+compound_stmt *COMPOUND_STMT(list *statement_list, namespace_t *namespace)
 {
     compound_stmt *retptr = (compound_stmt *)malloc(sizeof(compound_stmt));
     retptr->type = compound_stmt_t;
     retptr->statement_list = statement_list;
+    retptr->namespace = namespace;
     return retptr;
 }
 
