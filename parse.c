@@ -2,16 +2,17 @@
 #include <string.h>
 #include "barec.h"
 
-int isize(list *type_list);
-
 int type(void *stmt) {
     return *(int *)stmt;
 }
 
-auto_storage *auto_storage_init() {
+auto_storage *auto_storage_init(int constant, int iaddress, void *vaddress)
+{
     auto_storage *retptr = malloc(sizeof(auto_storage));
     retptr->type = auto_storage_t;
-    retptr->address = 0;
+    retptr->constant = constant;
+    retptr->iaddress = iaddress;
+    retptr->vaddress = vaddress;
     return retptr;
 }
 
@@ -106,14 +107,35 @@ indirection *ARRAY_REF(void *primary, void *expr) {
     return INDIRECTION(expr2);
 }
 
+static void storage_add_size(auto_storage *left, struct size *right)
+{
+    if (left->constant) {
+        if (right->constant)
+            left->iaddress += right->ival;
+        else {
+            left->vaddress = BINARY(add, ARITHMETIC(itoa(left->iaddress), int_t), right->vval);
+            left->constant = 0;
+        }
+    }
+    else {
+        if (right->constant)
+            left->vaddress = BINARY(add, left->vaddress, ARITHMETIC(itoa(right->ival), int_t));
+        else
+            left->vaddress = BINARY(add, left->vaddress, right->vval);
+    }
+}
+
 declaration *STRUCT_REF(void *primary, char *id) {
     list *type_list = get_type_list(primary), *ptr;
     struct_specifier *specifier = type_list->content;
     void *storage = ((declaration *)specifier->declaration_list->next->content)->storage;
     switch (type(storage)) {
         case auto_storage_t: {
-            auto_storage *as = auto_storage_init();
-            as->address = ARITHMETIC(strdup("0"), int_t);
+            auto_storage *primary_storage = storage;
+            int constant = primary_storage->constant;
+            int iaddress = primary_storage->iaddress;
+            void *vaddress = primary_storage->vaddress;
+            auto_storage *as = auto_storage_init(constant, iaddress, vaddress);
             for (ptr = specifier->declaration_list->next; ptr; ptr = ptr->next) {
                 declaration *node = ptr->content;
                 if (!strcmp(node->id, id)) {
@@ -121,26 +143,30 @@ declaration *STRUCT_REF(void *primary, char *id) {
                     return node;
                 }
                 else
-                    as->address = BINARY(add, as->address, SIZE(node->type_list));
+                    storage_add_size(as, size(node->type_list));
             }
             break;
         }
         case static_storage_t: {
+            static_storage *primary_storage = storage;
             static_storage *ss = static_storage_init();
-            ss->address = 0;
+            ss->address = primary_storage->address;
             for (ptr = specifier->declaration_list->next; ptr; ptr = ptr->next) {
                 declaration *node = ptr->content;
                 if (!strcmp(node->id, id)) {
                     node->storage = ss;
                     return node;
                 }
-                else
-                    ss->address += isize(node->type_list);
+                else {
+                    struct size *thesize = size(node->type_list);
+                    if (thesize->constant)
+                        ss->address += thesize->ival;
+                    else /* error */;
+                }
             }
             break;
         }
     }
-
 }
 
 posinc *POSINC(void *primary, int inc) {
@@ -188,49 +214,113 @@ unary *UNARY(void *expr, char *op) {
     return retptr;
 }
 
-static inline arithmetic *arith_size(arithmetic_specifier *ptr)
+static inline int arith_size(arithmetic_specifier *ptr)
 {
     char *val;
     switch (ptr->atype) {
-        case unsigned_char_t: case char_t: val = "1"; break;
-        case unsigned_short_t: case short_t: val = "2"; break;
-        case unsigned_int_t: case int_t: val = "4"; break;
-        case unsigned_long_long_t: case long_long_t: val = "8"; break;
-        case float_t: val = "4"; break;
-        case double_t: val = "8"; break;
+        case unsigned_char_t: case char_t: return 1;
+        case unsigned_short_t: case short_t: return 2;
+        case unsigned_int_t: case int_t: return 4;
+        case unsigned_long_long_t: case long_long_t: return 8;
+        case float_t: return 4;
+        case double_t: return 8;
     }
-    return ARITHMETIC(strdup(val), int_t);
 }
 
-void *SIZE(list *type_list)
+struct size *size_init(int constant, int ival, void *vval)
 {
+    struct size *retptr = (struct size *)malloc(sizeof(struct size));
+    retptr->constant = constant;
+    retptr->ival = ival;
+    retptr->vval = vval;
+    return retptr;
+}
+
+struct size *size(list *type_list)
+{
+    int ival = 1;
+    void *vval = ARITHMETIC(strdup("1"), int_t);
+    int constant = 1;
     list *ptr;
-    void *retptr = ARITHMETIC(strdup("1"), int_t);
     for (ptr = type_list; ptr->next; ptr = ptr->next) {
         switch (type(ptr->content)) {
-            case pointer_t:
-                return BINARY(mul, retptr, ARITHMETIC(strdup("4"), int_t));
-            case array_t:
-                return BINARY(mul, retptr, ((array *)ptr->content)->size);
-            break;
+            case pointer_t: {
+                if (constant)
+                    ival *= 4;
+                else
+                    vval = BINARY(mul, vval, ARITHMETIC(strdup("4"), int_t));
+                return size_init(constant, ival, vval);
+            }
+            case array_t: {
+                array *arr = (array *)ptr->content;
+                if (constant) {
+                    if (type(arr->size) == arithmetic_t) {
+                        arithmetic *arith = (arithmetic *)arr->size;
+                        arithmetic_specifier *specifier = arith->type_list->content;
+                        if (specifier->atype == int_t)
+                            ival *= atoi(arith->value);
+                    }
+                    else {
+                        vval = BINARY(mul, ARITHMETIC(itoa(ival), int_t), arr->size);
+                        constant = 0;
+                    }
+                }
+                else {
+                    vval = BINARY(mul, vval, arr->size);
+                }
+                break;
+            }
         }
     }
-    void *last_size;
-    if (type(ptr->content) == arithmetic_specifier_t)
-        last_size = arith_size(ptr->content);
-    else if (type(ptr->content) == struct_specifier_t) {
-        struct_specifier *specifier = ptr->content;
-        last_size = ARITHMETIC(strdup("1"), int_t);
-        list *p;
-        for (p = specifier->declaration_list->next; p; p = p->next)
-            last_size = BINARY(add, last_size, SIZE2(p->content));
+    switch (type(ptr->content)) {
+        case arithmetic_specifier_t: {
+            if (constant)
+                ival *= arith_size(ptr->content);
+            else
+                vval = BINARY(mul, vval, ARITHMETIC(itoa(arith_size(ptr->content)), int_t));
+            return size_init(constant, ival, vval);
+        }
+        case struct_specifier_t: {
+            int last_ival = 1;
+            void *last_vval = ARITHMETIC(strdup("1"), int_t);
+            int last_constant = 1;
+            struct_specifier *specifier = (struct_specifier *)ptr->content;
+            list *p;
+            struct size *asize;
+            for (p = specifier->declaration_list->next; p; p = p->next) {
+                asize = size(get_type_list(p->content));
+                if (last_constant) {
+                    if (asize->constant)
+                        last_ival += asize->ival;
+                    else {
+                        last_vval = BINARY(add, ARITHMETIC(itoa(last_ival), int_t), asize->vval);
+                        last_constant = 0;
+                    }
+                }
+                else {
+                    if (asize->constant)
+                        last_vval = BINARY(add, vval, ARITHMETIC(itoa(asize->ival), int_t));
+                    else
+                        last_vval = BINARY(add, vval, asize->vval);
+                }
+            }
+            if (constant) {
+                if (last_constant)
+                    ival *= last_ival;
+                else {
+                    vval = BINARY(mul, ARITHMETIC(itoa(ival), int_t), last_vval);
+                    constant = 0;
+                }
+            }
+            else {
+                if (last_constant)
+                    vval = BINARY(mul, vval, ARITHMETIC(itoa(last_ival), int_t));
+                else
+                    vval = BINARY(mul, vval, last_vval);
+            }
+            return size_init(constant, ival, vval);
+        }
     }
-    return BINARY(mul, retptr, last_size);
-}
-
-void *SIZE2(void *expr)
-{
-    return SIZE(get_type_list(expr));
 }
 
 cast *CAST(list *type_list, cast *expr)
@@ -259,6 +349,15 @@ binary *BINARY(btype_t btype, void *left, void *right)
             retptr->type_list->content = arithmetic_specifier_init(int_t);
             break;
     }
+    return retptr;
+}
+
+assignment *ASSIGNMENT(void *expr1, void *expr2)
+{
+    assignment *retptr = (assignment *)malloc(sizeof(assignment));
+    retptr->type = assignment_t;
+    retptr->expr1 = expr1;
+    retptr->expr2 = expr2;
     return retptr;
 }
 

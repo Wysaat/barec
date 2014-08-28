@@ -4,16 +4,16 @@ section .text:
 function_f:
 push ebp
 mov ebp, esp
-mov eax, 1
-push eax
-mov eax, 4
-pop ebx
-imul ebx
-push eax
-mov eax, 0
-pop ebx
-add eax, ebx
+mov eax, 8
 sub esp, eax
+mov eax, 0
+mov ebx, ebp
+sub ebx, eax
+mov eax, ebx
+push eax
+lea eax, [ebp+12]
+mov eax, [eax]
+push eax
 lea eax, [ebp+8]
 mov eax, [eax]
 push eax
@@ -21,3 +21,7 @@ lea eax, [ebp+4]
 mov eax, [eax]
 pop ebx
 add eax, ebx
+pop ebx
+add eax, ebx
+pop ebx
+mov [ebx], eax

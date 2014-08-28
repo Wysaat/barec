@@ -61,11 +61,13 @@ char *itoa(int value) {
 list *list_node() {
     list *retptr = (list *)malloc(sizeof(list));
     memset(retptr, 0, sizeof(list));
+    retptr->type = list_t;
     return retptr;
 }
 
 list *list_init(void *content) {
     list *retptr = (list *)malloc(sizeof(list));
+    retptr->type = list_t;
     retptr->content = content;
     retptr->prev = 0;
     retptr->next = 0;

@@ -41,6 +41,7 @@ enum types {
     expression_t,
     expression_stmt_t,
     compound_stmt_t,
+    list_t,
 };
 
 enum atypes {
@@ -62,7 +63,7 @@ enum atypes {
 typedef struct namespace {
     list *struct_s_list;
     list *declaration_list;
-    void *auto_size;
+    struct size *auto_size;
     struct namespace *outer;
 } namespace_t;
 
@@ -87,9 +88,17 @@ typedef enum btype {
     lor,
 } btype_t;
 
+struct size {
+    int constant;
+    int ival;
+    void *vval;
+};
+
 typedef struct auto_storage {
     int type;
-    void *address;
+    int constant;
+    int iaddress;
+    void *vaddress;
 } auto_storage;
 
 typedef struct static_storage {
@@ -261,14 +270,14 @@ void *pares_expression_stmt(FILE *stream, namespace_t *namespace);
 void *parse_statement(FILE *stream, struct namespace *namespace);
 void *parse_declaration_or_statement(FILE *stream, struct namespace *namespace);
 void *parse_compound_stmt(FILE *stream, struct namespace *namespace, list *parameter_list);
+void *size_to_expr(struct size *size);
 
 /*
  * parse.c
  */
 
 int type(void *);
-
-auto_storage *auto_storage_init();
+auto_storage *auto_storage_init(int constant, int iaddress, void *vaddress);
 static_storage *static_storage_init();
 arithmetic_specifier *arithmetic_specifier_init(int atype);
 struct_specifier *struct_specifier_init(char *id, list *declaration_list);
@@ -287,10 +296,9 @@ preinc *PREINC(void *expr, int inc);
 addr *ADDR(void *expr);
 indirection *INDIRECTION(void *expr);
 unary *UNARY(void *expr, char *op);
-void *SIZE(list *type_list);
-void *SIZE2(void *expr);
 cast *CAST(list *type_list, cast *expr);
 binary *BINARY(btype_t btype, void *left, void *right);
+assignment *ASSIGNMENT(void *expr1, void *expr2);
 expression *EXPRESSION(list *assignment_list, list *type_list);
 expression_stmt *EXPRESSION_STMT(list *assignment_list);
 compound_stmt *COMPOUND_STMT(list *declaration_statement_list, namespace_t *namespace);
@@ -298,6 +306,8 @@ arithmetic_specifier *integral_promotion(arithmetic_specifier *s);
 list *integral_promotion2(list *type_list);
 list *get_type_list(void *vptr);
 void set_type_list(list *type_list, void *vptr);
+struct size *size_init(int constant, int ival, void *vval);
+struct size *size(list *type_list);
 
 /*
  * utils.c
@@ -315,6 +325,7 @@ char *get_tab();
 
 /* the list has an empty head */
 struct list {
+    int type;
     void *content;
     list *prev;
     list *next;
@@ -328,7 +339,7 @@ typedef struct buffer {
 } buffer;
 
 list *list_node();
-list *list_init(void *content);
+list *list_init(void *content); /* it DOESN'T make a list with an empty head! */
 void list_append(list *, void *);
 void list_extend(list *first, list *second);
 buffer *buff_init();

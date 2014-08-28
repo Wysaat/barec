@@ -68,7 +68,12 @@ void addr_gencode(addr *expr)
         declaration *node = expr->expr;
         if (type(node->storage) == auto_storage_t) {
             auto_storage *storage = node->storage;
-            gencode(storage->address);
+            if (storage->constant) {
+                buff_add(text_buff, "mov eax, ");
+                buff_addln(text_buff, itoa(storage->iaddress));
+            }
+            else
+                gencode(storage->vaddress);
             buff_add(text_buff,
                 "mov ebx, ebp\n"
                 "sub ebx, eax\n"
@@ -640,7 +645,7 @@ void function_definition_gencode(function_definition_t *function_definition)
         "push ebp\n"
         "mov ebp, esp\n"
         );
-    gencode(function_definition->body->namespace->auto_size);
+    gencode(size_to_expr(function_definition->body->namespace->auto_size));
     buff_add(text_buff, "sub esp, eax\n");
     compound_stmt_gencode(function_definition->body);
 }
