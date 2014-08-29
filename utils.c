@@ -138,7 +138,7 @@ char *buff_puts(buffer *buff) {
     return retptr;
 }
 
-char *get_tab()
+char *get_tag()
 {
     char *t = itoa(tab++);
     char *retptr = (char *)malloc(strlen(t) + 1 + 1);

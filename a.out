@@ -1,27 +1,32 @@
 section .data:
+t0:
+dd 32423
+t3:
+dd 88
+dd 77
+dd 66
+dd 55
+dd 44
+dd 33
 section .bss:
+t1:
+resb 4
+t2:
+resb 4
+resb 4
+resb 4
+resb 4
 section .text:
 function_f:
 push ebp
 mov ebp, esp
-mov eax, 8
+mov eax, 4
 sub esp, eax
 mov eax, 0
 mov ebx, ebp
 sub ebx, eax
 mov eax, ebx
 push eax
-lea eax, [ebp+12]
-mov eax, [eax]
-push eax
-lea eax, [ebp+8]
-mov eax, [eax]
-push eax
-lea eax, [ebp+4]
-mov eax, [eax]
-pop ebx
-add eax, ebx
-pop ebx
-add eax, ebx
+mov eax, 3720
 pop ebx
 mov [ebx], eax

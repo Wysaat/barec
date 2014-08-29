@@ -86,6 +86,13 @@ void addr_gencode(addr *expr)
             buff_add(text_buff, itoa(4+storage->address));
             buff_add(text_buff, "]\n");
         }
+        else if (type(node->storage) == static_storage_t) {
+            static_storage *storage = node->storage;
+            buff_add(text_buff, "lea eax, ");
+            buff_addln(text_buff, storage->tag);
+            buff_add(text_buff, "add eax, ");
+            buff_addln(text_buff, itoa(storage->relative_addr));
+        }
     }
     else if (type(expr->expr) == string_t) {
         string_gencode(expr->expr);
@@ -515,7 +522,7 @@ void binary_gencode_logical(btype_t btype, void *left, void *right)
         case unsigned_long_t: case long_t: case unsigned_int_t: case int_t: {
             gencode(left);
             buff_add(text_buff, "cmp eax, 0\n");
-            char *t1 = get_tab();
+            char *t1 = get_tag();
             btype == land ? buff_add(text_buff, "je ") :
                            buff_add(text_buff, "jne ");
             buff_addln(text_buff, t1);
@@ -526,7 +533,7 @@ void binary_gencode_logical(btype_t btype, void *left, void *right)
             buff_addln(text_buff, t1);
             btype == land ? buff_add(text_buff, "mov eax, 1\n") :
                            buff_add(text_buff, "mov eax, 0\n");
-            char *t2 = get_tab();
+            char *t2 = get_tag();
             buff_add(text_buff, "jmp "); buff_addln(text_buff, t2);
             buff_add(text_buff, t1); buff_add(text_buff, ":\n");
             btype == land ? buff_add(text_buff, "mov eax, 0\n") :
@@ -595,6 +602,75 @@ void assignment_gencode(assignment *expr)
     }
 }
 
+static inline char *init_prefix(int size)
+{
+    switch (size) {
+        case 1: return "db ";
+        case 2: return "dw ";
+        case 4: return "dd ";
+        case 8: return "dq ";
+    }
+}
+
+static inline char *constant_value(void *constant)
+{
+    switch (type(constant)) {
+        case arithmetic_t:
+            return ((arithmetic *)constant)->value;
+    }
+}
+
+static void sig_subproc1(void *body)
+{
+    if (type(body) == compound_stmt_t) {
+        compound_stmt *stmt = body;
+        list *ptr;
+        for (ptr = stmt->statement_list->next; ptr; ptr = ptr->next)
+            sig_subproc1(ptr->content);
+    }
+    else {
+        assignment *stmt = body;
+        struct size *thesize = size(get_type_list(stmt->expr1));
+        char *prefix = init_prefix(thesize->ival);
+        buff_add(data_buff, prefix);
+        if (stmt->expr2)
+            buff_addln(data_buff, constant_value(stmt->expr2));
+        else
+            buff_addln(data_buff, "0");
+    }
+}
+
+static void sig_subproc2(void *body)
+{
+    if (type(body) == compound_stmt_t) {
+        compound_stmt *stmt = body;
+        list *ptr;
+        for (ptr = stmt->statement_list->next; ptr; ptr = ptr->next)
+            sig_subproc2(ptr->content);
+    }
+    else {
+        assignment *stmt = body;
+        struct size *thesize = size(get_type_list(stmt->expr1));
+        buff_add(bss_buff, "resb ");
+        buff_addln(bss_buff, itoa(thesize->ival));
+    }
+}
+
+void static_initialization_gencode(static_initialization *initial)
+{
+    list *ptr;
+    if (initial->initialized) {
+        buff_add(data_buff, initial->tag);
+        buff_add(data_buff, ":\n");
+        sig_subproc1(initial->body);
+    }
+    else {
+        buff_add(bss_buff, initial->tag);
+        buff_add(bss_buff, ":\n");
+        sig_subproc2(initial->body);
+    }
+}
+
 void expression_gencode(expression *expr)
 {
     list *ptr;
@@ -627,12 +703,11 @@ void gencode(void *expr)
         case unary_t: unary_gencode(expr); break;
         case cast_t: cast_gencode(expr); break;
         case binary_t: binary_gencode(expr); break;
-        // case m_expr_t: m_expr_gencode(expr); break;
-        // case a_expr_t: a_expr_gencode(expr); break;
         case assignment_t: assignment_gencode(expr); break;
         case expression_t: expression_gencode(expr); break;
         case expression_stmt_t: expression_stmt_gencode(expr); break;
         case compound_stmt_t: compound_stmt_gencode(expr); break;
+        case static_initialization_t: static_initialization_gencode(expr); break;
     }
 }
 

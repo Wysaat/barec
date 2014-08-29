@@ -19,7 +19,6 @@ auto_storage *auto_storage_init(int constant, int iaddress, void *vaddress)
 static_storage *static_storage_init() {
     static_storage *retptr = malloc(sizeof(static_storage));
     retptr->type = static_storage_t;
-    retptr->address = 0;
     return retptr;
 }
 
@@ -150,7 +149,7 @@ declaration *STRUCT_REF(void *primary, char *id) {
         case static_storage_t: {
             static_storage *primary_storage = storage;
             static_storage *ss = static_storage_init();
-            ss->address = primary_storage->address;
+            ss->relative_addr = primary_storage->relative_addr;
             for (ptr = specifier->declaration_list->next; ptr; ptr = ptr->next) {
                 declaration *node = ptr->content;
                 if (!strcmp(node->id, id)) {
@@ -160,7 +159,7 @@ declaration *STRUCT_REF(void *primary, char *id) {
                 else {
                     struct size *thesize = size(node->type_list);
                     if (thesize->constant)
-                        ss->address += thesize->ival;
+                        ss->relative_addr += thesize->ival;
                     else /* error */;
                 }
             }

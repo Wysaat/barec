@@ -42,6 +42,7 @@ enum types {
     expression_stmt_t,
     compound_stmt_t,
     list_t,
+    static_initialization_t,
 };
 
 enum atypes {
@@ -88,6 +89,13 @@ typedef enum btype {
     lor,
 } btype_t;
 
+typedef struct static_initialization {
+    int type;
+    char *tag;
+    struct compound_stmt *body;
+    int initialized;
+} static_initialization;
+
 struct size {
     int constant;
     int ival;
@@ -103,7 +111,8 @@ typedef struct auto_storage {
 
 typedef struct static_storage {
     int type;
-    int address;
+    char *tag;
+    int relative_addr;
 } static_storage;
 
 // storage for function parameters
@@ -253,9 +262,9 @@ typedef struct function_definition {
 
 char *scan(FILE *stream);
 
-list *parse_specifier(FILE *stream, struct namespace *namespace);
+list *parse_specifier(FILE *stream, struct namespace *namespace, int flag);
 declarator *parse_declarator(FILE *stream, int abstract, struct namespace *namespace, int is_funcdef);
-void *parse_declaration(FILE *stream, struct namespace *namespace, int in_struct);
+void *parse_declaration(FILE *stream, struct namespace *namespace, int in_struct, int flag);
 list *parse_type_name(FILE *stream, struct namespace *namespace);
 void *parse_primary(FILE *stream, namespace_t *namespace);
 void *parse_postfix(FILE *stream, namespace_t *namespace);
@@ -321,7 +330,7 @@ int is_id(char *token);
 int is_int(char *token);
 char *itoa(int value);
 
-char *get_tab();
+char *get_tag();
 
 /* the list has an empty head */
 struct list {
