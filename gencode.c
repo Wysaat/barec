@@ -358,16 +358,21 @@ void binary_gencode_add(btype_t btype, void *left, void *right)
                 "pop ecx\n" /* lo */
                 "\n"
                 );
-            btype == add ? buff_add(text_buff,
-                                    "adc eax, ecx\n"
-                                    "jnc t1\n"
-                                    "inc edx\n"
-                                    "t1: add edx, ebx\n"
-                                    "\n")
-                         : buff_add(text_buff,
-                                    "sub eax, ecx\n"
-                                    "sbb edx, ebx\n"
-                                    "\n");
+            if (btype == add) {
+                char *tag = get_tag();
+                buff_add(text_buff, "adc eax, ecx\n");
+                buff_add(text_buff, "jnc ");
+                buff_addln(text_buff, tag);
+                buff_add(text_buff, "inc edx\n");
+                buff_add(text_buff, tag);
+                buff_add(text_buff, ": add edx, ebx\n");
+            }
+            else {
+                buff_add(text_buff,
+                    "sub eax, ecx\n"
+                    "sbb edx, ebx\n"
+                    "\n");
+            }
             break;
         case unsigned_long_t: case long_t: case unsigned_int_t: case int_t:
             gencode(right);
@@ -692,6 +697,102 @@ void compound_stmt_gencode(compound_stmt *expr)
         gencode(ptr->content);
 }
 
+void if_stmt_gencode(if_stmt *stmt)
+{
+    gencode(stmt->expr);
+    char *tag = get_tag();
+    buff_add(text_buff, "jnz ");
+    buff_addln(text_buff, tag);
+    gencode(stmt->statement1);
+    buff_add(text_buff, tag);
+    buff_add(text_buff, ":\n");
+    if (stmt->statement2)
+        gencode(stmt->statement2);
+}
+
+static list *list_add_ip(list *left, list *right)
+{
+    list *ptr = left;
+    while (ptr->next)
+        ptr = ptr->next;
+    ptr->next = right->next;
+    return left;
+}
+
+static list *find_cases(void *statement)
+{
+    switch (type(statement)) {
+        case expression_stmt_t:
+            return list_node();
+        case compound_stmt_t: {
+            compound_stmt *compound = statement;
+            list *ptr;
+            list *retptr = list_node();
+            for (ptr = compound->statement_list->next; ptr; ptr = ptr->next)
+                retptr = list_add_ip(retptr, find_cases(ptr->content));
+            return retptr;
+        }
+        case id_labeled_stmt_t:
+            return find_cases(((id_labeled_stmt *)statement)->statement);
+        case case_stmt_t:
+            return list_add_ip(list_init_wh(statement), find_cases(((case_stmt *)statement)->statement));
+        case default_stmt_t:
+            return list_add_ip(list_init_wh(statement), find_cases(((default_stmt *)statement)->statement));
+        case if_stmt_t:
+            return list_add_ip(find_cases(((if_stmt *)statement)->statement1),
+                               find_cases(((if_stmt *)statement)->statement2));
+        case switch_stmt_t:
+            return list_node();
+    }
+}
+
+void switch_stmt_gencode(switch_stmt *stmt)
+{
+    gencode(stmt->expr);
+    list *cases = find_cases(stmt->statement), *ptr;
+    default_stmt *d = 0;
+    for (ptr = cases->next; ptr; ptr = ptr->next) {
+        if (type(ptr->content) == case_stmt_t) {
+            case_stmt *c = ptr->content;
+            buff_add(text_buff, "cmp eax, ");
+            buff_addln(text_buff, c->value);
+            buff_add(text_buff, "je ");
+            buff_addln(text_buff, c->tag);
+        }
+        else
+            d = ptr->content;
+    }
+    buff_add(text_buff, "jmp ");
+    char *endtag = get_tag();
+    if (d)
+        buff_addln(text_buff, d->tag);
+    else
+        buff_addln(text_buff, endtag);
+    gencode(stmt->statement);
+    buff_add(text_buff, endtag);
+}
+
+void case_stmt_gencode(case_stmt *stmt)
+{
+    buff_add(text_buff, stmt->tag);
+    buff_add(text_buff, ":\n");
+    gencode(stmt->statement);
+}
+
+void default_stmt_gencode(default_stmt *stmt)
+{
+    buff_add(text_buff, stmt->tag);
+    buff_add(text_buff, ":\n");
+    gencode(stmt->statement);
+}
+
+void id_labeled_stmt_gencode(id_labeled_stmt *stmt)
+{
+    buff_add(text_buff, stmt->tag);
+    buff_add(text_buff, ":\n");
+    gencode(stmt->statement);
+}
+
 void gencode(void *expr)
 {
     switch (type(expr)) {
@@ -707,6 +808,11 @@ void gencode(void *expr)
         case expression_t: expression_gencode(expr); break;
         case expression_stmt_t: expression_stmt_gencode(expr); break;
         case compound_stmt_t: compound_stmt_gencode(expr); break;
+        case if_stmt_t: if_stmt_gencode(expr); break;
+        case switch_stmt_t: switch_stmt_gencode(expr); break;
+        case case_stmt_t: case_stmt_gencode(expr); break;
+        case default_stmt_t: default_stmt_gencode(expr); break;
+        case id_labeled_stmt_t: id_labeled_stmt_gencode(expr); break;
         case static_initialization_t: static_initialization_gencode(expr); break;
     }
 }

@@ -5,17 +5,61 @@
 
 #define write_code(CODE, STREAM) fwrite(CODE, 1, strlen(CODE), STREAM)
 
+struct {
+    char *file_name;
+    int line;
+    int lastline_column;
+    int column;
+    int error;
+} file_info;
+
+static char f_fgetc(FILE *stream)
+{
+    char retval = fgetc(stream);
+    if (retval == '\n') {
+        file_info.line++;
+        file_info.lastline_column = file_info.column;
+        file_info.column = 0;
+    }
+    else
+        file_info.column++;
+    return retval;
+}
+
+void f_ungetc(char ch, FILE *stream)
+{
+    ungetc(ch, stream);
+    if (ch == '\n') {
+        file_info.column = file_info.lastline_column;
+        file_info.line--; 
+    }
+    else
+        file_info.column--;
+}
+
 char *scan(FILE *stream) {
     char *buffer = (char *)malloc(1024);
     int ch, i = 0;
+    int in_old_comment = 0;
+    int in_new_comment = 0;
     while (!feof(stream)) {
-        ch = fgetc(stream);
+        while (in_old_comment || in_new_comment) {
+            ch = f_fgetc(stream);
+            if (in_old_comment && ch == '*') {
+                ch = f_fgetc(stream);
+                if (ch == '/')
+                    in_old_comment = 0;
+            }
+            else if (in_new_comment && ch == '\n')
+                in_new_comment = 0;
+        }
+        ch = f_fgetc(stream);
         if (ch == '>' || ch == '<') {
             buffer[0] = ch;
-            ch = fgetc(stream);
+            ch = f_fgetc(stream);
             if (ch == buffer[0]) {
                 buffer[1] = ch;
-                ch = fgetc(stream);
+                ch = f_fgetc(stream);
                 if (ch == '=') {
                     buffer[2] = ch;
                     buffer[3] = 0;
@@ -23,7 +67,7 @@ char *scan(FILE *stream) {
                 }
                 else {
                     buffer[2] = 0;
-                    ungetc(ch, stream);
+                    f_ungetc(ch, stream);
                     return buffer;
                 }
             }
@@ -34,13 +78,13 @@ char *scan(FILE *stream) {
             }
             else {
                 buffer[1] = 0;
-                ungetc(ch, stream);
+                f_ungetc(ch, stream);
                 return buffer;
             }
         }
         else if (ch == '+' || ch == '&' || ch == '|') {
             buffer[0] = ch;
-            ch = fgetc(stream);
+            ch = f_fgetc(stream);
             if (ch == buffer[0] || ch == '=') {
                 buffer[1] = ch;
                 buffer[2] = 0;
@@ -48,13 +92,13 @@ char *scan(FILE *stream) {
             }
             else {
                 buffer[1] = 0;
-                ungetc(ch, stream);
+                f_ungetc(ch, stream);
                 return buffer;
             }
         }
         else if (ch == '-') {
             buffer[0] = ch;
-            ch = fgetc(stream);
+            ch = f_fgetc(stream);
             if (ch == buffer[0] || ch == '=' || ch == '>') {
                 buffer[1] = ch;
                 buffer[2] = 0;
@@ -62,14 +106,27 @@ char *scan(FILE *stream) {
             }
             else {
                 buffer[1] = 0;
-                ungetc(ch, stream);
+                f_ungetc(ch, stream);
                 return buffer;
             }
         }
         else if (ch == '=' || ch == '!' || ch == '*' || ch == '^'
                      || ch == '/' || ch == '%') {
+            if (ch == '/') {
+                int ch2 = f_fgetc(stream);
+                if (ch2 == '*') {
+                    in_old_comment = 1;
+                    continue;
+                }
+                else if (ch2 == '/') {
+                    in_new_comment = 1;
+                    continue;
+                }
+                else
+                    f_ungetc(ch, stream);
+            }
             buffer[0] = ch;
-            ch = fgetc(stream);
+            ch = f_fgetc(stream);
             if (ch == '=') {
                 buffer[1] = ch;
                 buffer[2] = 0;
@@ -77,7 +134,7 @@ char *scan(FILE *stream) {
             }
             else {
                 buffer[1] = 0;
-                ungetc(ch, stream);
+                f_ungetc(ch, stream);
                 return buffer;
             }
         }
@@ -88,17 +145,17 @@ char *scan(FILE *stream) {
             return buffer;
         }
         else if (ch == '.') {
-            ch = fgetc(stream);
+            ch = f_fgetc(stream);
             if (ch >= '0' && ch <= '9') {
                 buffer[0] = '.';
                 buffer[1] = ch;
                 i = 2;
                 while (1) {
-                    ch = fgetc(stream);
+                    ch = f_fgetc(stream);
                     if (ch >= '0' && ch <= '9')
                         buffer[i++] = ch;
                     else {
-                        ungetc(ch, stream);
+                        f_ungetc(ch, stream);
                         break;
                     }
                 }
@@ -106,7 +163,7 @@ char *scan(FILE *stream) {
                 return buffer;
             }
             else {
-                ungetc(ch, stream);
+                f_ungetc(ch, stream);
                 buffer[0] = '.';
                 buffer[1] = 0;
                 return buffer;
@@ -117,7 +174,7 @@ char *scan(FILE *stream) {
             buffer[i++] = ch;
             int point = 0;
             while (1) {
-                ch = fgetc(stream);
+                ch = f_fgetc(stream);
                 if (ch >= '0' && ch <= '9')
                     buffer[i++] = ch;
                 else if (ch == '.') {
@@ -127,7 +184,7 @@ char *scan(FILE *stream) {
                     }
                 }
                 else {
-                    ungetc(ch, stream);
+                    f_ungetc(ch, stream);
                     break;
                 }
             }
@@ -138,12 +195,12 @@ char *scan(FILE *stream) {
             i = 0;
             buffer[i++] = ch;
             while (1) {
-                ch = fgetc(stream);
+                ch = f_fgetc(stream);
                 if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z' || ch == '_') ||
                          (ch >= '0' && ch <= '9'))
                     buffer[i++] = ch;
                 else {
-                    ungetc(ch, stream);
+                    f_ungetc(ch, stream);
                     break;
                 }
             }
@@ -154,7 +211,7 @@ char *scan(FILE *stream) {
             i = 0;
             buffer[i++] = ch;
             while (1) {
-                ch = fgetc(stream);
+                ch = f_fgetc(stream);
                 buffer[i++] = ch;
                 if (ch == buffer[0]) {
                     buffer[i] = 0;
@@ -978,7 +1035,7 @@ void *parse_a_expr(FILE *stream, namespace_t *namespace) {
             }
             else if ((get_type(expr) == pointer_t || get_type(expr) == array_t) && type_is_int(expr2))
                 expr = BINARY(btype, expr, BINARY(mul, expr2, size_expr(get_type_list(INDIRECTION(expr)))));
-            else if ((get_type(expr2) == pointer_t || get_type(expr) == array_t) && type_is_int(expr))
+            else if ((get_type(expr2) == pointer_t || get_type(expr2) == array_t) && type_is_int(expr))
                 expr = BINARY(btype, expr2, BINARY(mul, expr, size_expr(get_type_list(INDIRECTION(expr2)))));
         }
         else {
@@ -1139,12 +1196,36 @@ void *parse_conditional(FILE *stream, namespace_t *namespace) {
     return parse_logical_or(stream, namespace);
 }
 
+static int is_assignment_operator(char *token) {
+    char *assignment_operators[] = {
+        "=", "*=", "/=", "%=", "+=", "-=", "<<=", ">>=", "&=", "^=", "|=", 0,
+        };
+    char **ptr;
+    for (ptr = assignment_operators; *ptr; ptr++)
+        if (!strcmp(token, *ptr))
+            return 1;
+    return 0;
+}
+
 void *parse_assignment(FILE *stream, namespace_t *namespace) {
     void *expr = parse_conditional(stream, namespace);
     char *token = scan(stream);
     if (!strcmp(token, "=")) {
         void *expr2 = parse_assignment(stream, namespace);
         return ASSIGNMENT(expr, expr2);
+    }
+    else if (is_assignment_operator(token)) {
+        btype_t btype = !strcmp(token, "*=") ? mul :
+                        !strcmp(token, "/=") ? divi :
+                        !strcmp(token, "%=") ? mod :
+                        !strcmp(token, "+=") ? add :
+                        !strcmp(token, "-=") ? sub :
+                        !strcmp(token, "<<=") ? lshift :
+                        !strcmp(token, ">>=") ? rshift :
+                        !strcmp(token, "&=") ? band :
+                        !strcmp(token, "^=") ? bxor : bor;
+        void *expr2 = parse_assignment(stream, namespace);
+        return ASSIGNMENT(expr, BINARY(btype, expr, expr2));
     }
     else {
         unscan(token, stream);
@@ -1183,6 +1264,24 @@ void *parse_statement(FILE *stream, struct namespace *namespace)
     unscan(token, stream);
     if (!strcmp(token, "{"))
         return parse_compound_stmt(stream, namespace, 0);
+    else if (!strcmp(token, "if"))
+        return parse_if_stmt(stream, namespace);
+    else if (!strcmp(token, "switch"))
+        return parse_switch_stmt(stream, namespace);
+    else if (!strcmp(token, "case"))
+        return parse_case_stmt(stream, namespace);
+    else if (!strcmp(token, "default"))
+        return parse_default_stmt(stream, namespace);
+    else if (is_id(token)) {
+        token = scan(stream);
+        char *token2 = scan(stream);
+        unscan(token2, stream);
+        unscan(token, stream);
+        if (!strcmp(token2, ":"))
+            return parse_id_labeled_stmt(stream, namespace);
+        else
+            return parse_expression_stmt(stream, namespace);
+    }
     else
         return parse_expression_stmt(stream, namespace);
 }
@@ -1213,6 +1312,141 @@ void *parse_compound_stmt(FILE *stream, namespace_t *namespace, list *parameter_
         if (statement)
             list_append(statement_list, statement);
     }
+}
+
+void error(char *message)
+{
+    printf("%s:%d:%d: error: %s\n", file_info.file_name, file_info.line, file_info.column, message);
+    file_info.error = 1;
+}
+
+void statement_error(char *token, FILE *stream)
+{
+    if (!strcmp(token, ";"))
+        return;
+    else if (!strcmp(token, "}")) {
+        unscan(token, stream);
+        return;
+    }
+    int a = 0;  // {}
+    int b = 0;  // []
+    int c = 0;  // ()
+    while (1) {
+        char *token = scan(stream);
+        if (!strcmp(token, ";") && a == 0 && b == 0 && c == 0)
+            return;
+        else if (!strcmp(token, "{")) a++;
+        else if (!strcmp(token, "[")) b++;
+        else if (!strcmp(token, "(")) c++;
+        else if (!strcmp(token, "}")) {
+            if (a == 0) {
+                unscan(token, stream);
+                return;
+            }
+            else
+                a--;
+        }
+        else if (!strcmp(token, "]") && b > 0) b--;
+        else if (!strcmp(token, ")") && c > 0) c--;
+    }
+}
+
+void *parse_if_stmt(FILE *stream, namespace_t *namespace)
+{
+    char *token = scan(stream);  // should be "if"
+    token = scan(stream);
+    if (strcmp(token, "(")) {
+        error("expected '(' after if");
+        statement_error(token, stream);
+        return 0;
+    }
+    void *expr = parse_expression(stream, namespace);
+    token = scan(stream);
+    if (strcmp(token, ")")) {
+        error("expected ')'");
+        statement_error(token, stream);
+        return 0;
+    }
+    void *statement = parse_statement(stream, namespace), *statement2 = 0;
+    token = scan(stream);
+    if (!strcmp(token, "else"))
+        statement2 = parse_statement(stream, namespace);
+    else
+        unscan(token, stream);
+    return IF_STMT(expr, statement, statement2);
+}
+
+void *parse_switch_stmt(FILE *stream, namespace_t *namespace)
+{
+    char *token = scan(stream);  // should be "switch"
+    token = scan(stream);
+    if (strcmp(token, "(")) {
+        error("expected '(' after switch");
+        statement_error(token, stream);
+        return 0;
+    }
+    void *expr = parse_expression(stream, namespace);
+    token = scan(stream);
+    if (strcmp(token, ")")) {
+        error("expected ')'");
+        statement_error(token, stream);
+        return 0;
+    }
+    void *statement = parse_statement(stream, namespace);
+    return SWITCH_STMT(expr, statement);
+}
+
+static int is_integral_constant(void *expression)
+{
+    if (type(expression) == arithmetic_t) {
+        arithmetic *arith = expression;
+        arithmetic_specifier *specifier = arith->type_list->content;
+        if (specifier->atype == int_t) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+void *parse_case_stmt(FILE *stream, namespace_t *namespace)
+{
+    char *token = scan(stream);  // should be "case"
+    void *expression = parse_conditional(stream, namespace);
+    char *value, *tag;
+    int err = 0;
+    if (!is_integral_constant(expression)) {
+        error("case label does not reduce to an integer constant");
+        err = 1;
+    }
+    else {
+        value = ((arithmetic *)expression)->value;
+        tag = get_tag();
+    }
+    token = scan(stream);
+    if (strcmp(token, ":")) {
+        error("expected ':' after case");
+        unscan(token, stream);
+        err = 1;
+    }
+    void *statement = parse_statement(stream, namespace);
+    return err? 0 : CASE_STMT(tag, value, statement);
+}
+
+void *parse_default_stmt(FILE *stream, namespace_t *namespace)
+{
+    char *token = scan(stream);  // it should be "default"
+    token = scan(stream);  // it should be ":"
+    void *statement = parse_statement(stream, namespace);
+    return DEFAULT_STMT(get_tag(), statement);
+}
+
+void *parse_id_labeled_stmt(FILE *stream, namespace_t *namespace)
+{
+    char *token = scan(stream);
+    char *id = token;
+    token = scan(stream);  // it should be ":"
+    void *statement = parse_statement(stream, namespace);
+    return ID_LABELED_STMT(get_tag(), id, statement);
 }
 
 static function_definition_t *function_definition_init(char *id, list *return_type_list, list *parameter_list, compound_stmt *body)
@@ -1265,6 +1499,11 @@ int main(int argc, char **argv)
 
     char *ifile = argv[1], *ofile = argv[2];
 
+    file_info.file_name = ifile;
+    file_info.line = 1;
+    file_info.column = 0;
+    file_info.error = 0;
+
     FILE *istream = fopen(ifile, "r");
     FILE *ostream = fopen(ofile, "w");
     data_buff = buff_init();
@@ -1275,6 +1514,8 @@ int main(int argc, char **argv)
     tab = 0;
 
     function_definition_t *function_definition = parse_function_definition(istream, namespace);
+    if (file_info.error)
+        return 0;
     function_definition_gencode(function_definition);
     char *data_section = buff_puts(data_buff);
     char *bss_section = buff_puts(bss_buff);

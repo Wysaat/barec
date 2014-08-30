@@ -41,6 +41,11 @@ enum types {
     expression_t,
     expression_stmt_t,
     compound_stmt_t,
+    if_stmt_t,
+    switch_stmt_t,
+    case_stmt_t,
+    default_stmt_t,
+    id_labeled_stmt_t,
     list_t,
     static_initialization_t,
 };
@@ -248,6 +253,39 @@ typedef struct compound_stmt {
     namespace_t *namespace;
 } compound_stmt;
 
+typedef struct if_stmt {
+    int type;
+    void *expr;
+    void *statement1;
+    void *statement2;
+} if_stmt;
+
+typedef struct switch_stmt {
+    int type;
+    void *expr;
+    void *statement;
+} switch_stmt;
+
+typedef struct case_stmt {
+    int type;
+    char *tag;
+    char *value;
+    void *statement;
+} case_stmt;
+
+typedef struct default_stmt {
+    int type;
+    char *tag;
+    void *statement;
+} default_stmt;
+
+typedef struct id_labeled_stmt {
+    int type;
+    char *tag;
+    char *id;
+    void *statement;
+} id_labeled_stmt;
+
 typedef struct function_definition {
     char *id;
     list *return_type_list;
@@ -279,6 +317,12 @@ void *pares_expression_stmt(FILE *stream, namespace_t *namespace);
 void *parse_statement(FILE *stream, struct namespace *namespace);
 void *parse_declaration_or_statement(FILE *stream, struct namespace *namespace);
 void *parse_compound_stmt(FILE *stream, struct namespace *namespace, list *parameter_list);
+void *parse_if_stmt(FILE *stream, namespace_t *namespace);
+void *parse_switch_stmt(FILE *stream, namespace_t *namespace);
+void *parse_case_stmt(FILE *stream, namespace_t *namespace);
+void *parse_default_stmt(FILE *stream, namespace_t *namespace);
+void *parse_id_labeled_stmt(FILE *stream, namespace_t *namespace);
+void error(char *message);
 void *size_to_expr(struct size *size);
 
 /*
@@ -311,6 +355,11 @@ assignment *ASSIGNMENT(void *expr1, void *expr2);
 expression *EXPRESSION(list *assignment_list, list *type_list);
 expression_stmt *EXPRESSION_STMT(list *assignment_list);
 compound_stmt *COMPOUND_STMT(list *declaration_statement_list, namespace_t *namespace);
+if_stmt *IF_STMT(void *expr, void *statement1, void *statement2);
+switch_stmt *SWITCH_STMT(void *expr, void *statement);
+case_stmt *CASE_STMT(char *tag, char *value, void *statement);
+default_stmt *DEFAULT_STMT(char *tag, void *statement);
+id_labeled_stmt *ID_LABELED_STMT(char *tag, char *id, void *statement);
 arithmetic_specifier *integral_promotion(arithmetic_specifier *s);
 list *integral_promotion2(list *type_list);
 list *get_type_list(void *vptr);
@@ -349,6 +398,7 @@ typedef struct buffer {
 
 list *list_node();
 list *list_init(void *content); /* it DOESN'T make a list with an empty head! */
+list *list_init_wh(void *first_content); /* it has an empty head */
 void list_append(list *, void *);
 void list_extend(list *first, list *second);
 buffer *buff_init();

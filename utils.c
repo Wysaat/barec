@@ -9,8 +9,8 @@ void unscan(char *token, FILE *stream) {
         ptr++;
 
     while (--ptr != token)
-        ungetc(*ptr, stream);
-    ungetc(*ptr, stream);
+        f_ungetc(*ptr, stream);
+    f_ungetc(*ptr, stream);
 }
 
 inline int is_id(char *token) {
@@ -71,6 +71,13 @@ list *list_init(void *content) {
     retptr->content = content;
     retptr->prev = 0;
     retptr->next = 0;
+    return retptr;
+}
+
+/* init a list with an empty head */
+list *list_init_wh(void *first_content) {
+    list *retptr = list_node();
+    retptr->next = list_init(first_content);
     return retptr;
 }
 

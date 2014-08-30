@@ -386,6 +386,54 @@ compound_stmt *COMPOUND_STMT(list *statement_list, namespace_t *namespace)
     return retptr;
 }
 
+if_stmt *IF_STMT(void *expr, void *statement1, void *statement2)
+{
+    if_stmt *retptr = (if_stmt *)malloc(sizeof(if_stmt));
+    retptr->type = if_stmt_t;
+    retptr->expr = expr;
+    retptr->statement1 = statement1;
+    retptr->statement2 = statement2;
+    return retptr;
+}
+
+switch_stmt *SWITCH_STMT(void *expr, void *statement)
+{
+    switch_stmt *retptr = malloc(sizeof(switch_stmt));
+    retptr->type = switch_stmt_t;
+    retptr->expr = expr;
+    retptr->statement = statement;
+    return retptr;
+}
+
+case_stmt *CASE_STMT(char *tag, char *value, void *statement)
+{
+    case_stmt *retptr = malloc(sizeof(case_stmt));
+    retptr->type = case_stmt_t;
+    retptr->tag = tag;
+    retptr->value = value;
+    retptr->statement = statement;
+    return retptr;
+}
+
+default_stmt *DEFAULT_STMT(char *tag, void *statement)
+{
+    default_stmt *retptr = malloc(sizeof(default_stmt));
+    retptr->type = default_stmt_t;
+    retptr->tag = tag;
+    retptr->statement = statement;
+    return retptr;
+}
+
+id_labeled_stmt *ID_LABELED_STMT(char *tag, char *id, void *statement)
+{
+    id_labeled_stmt *retptr = malloc(sizeof(id_labeled_stmt));
+    retptr->type = id_labeled_stmt_t;
+    retptr->tag = tag;
+    retptr->id = id;
+    retptr->statement = statement;
+    return retptr;
+}
+
 arithmetic_specifier *integral_promotion(arithmetic_specifier *s)
 {
     enum atypes atype = s->atype;
