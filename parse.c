@@ -22,6 +22,12 @@ static_storage *static_storage_init() {
     return retptr;
 }
 
+extern_storage *extern_storage_init() {
+    extern_storage *retptr = malloc(sizeof(extern_storage));
+    retptr->type = extern_storage_t;
+    return retptr;
+}
+
 arithmetic_specifier *arithmetic_specifier_init(int atype) {
     arithmetic_specifier *retptr = (arithmetic_specifier *)malloc(sizeof(arithmetic_specifier));
     retptr->type = arithmetic_specifier_t;
@@ -101,7 +107,7 @@ string *STRING(int address, char *value) {
     return retptr;
 }
 
-indirection *ARRAY_REF(void *primary, void *expr) {
+void *ARRAY_REF(void *primary, void *expr) {
     void *expr2 = BINARY(add, primary, expr);
     return INDIRECTION(expr2);
 }
@@ -124,46 +130,39 @@ static void storage_add_size(auto_storage *left, struct size *right)
     }
 }
 
-declaration *STRUCT_REF(void *primary, char *id) {
-    list *type_list = get_type_list(primary), *ptr;
-    struct_specifier *specifier = type_list->content;
-    void *storage = ((declaration *)specifier->declaration_list->next->content)->storage;
-    switch (type(storage)) {
-        case auto_storage_t: {
-            auto_storage *primary_storage = storage;
-            int constant = primary_storage->constant;
-            int iaddress = primary_storage->iaddress;
-            void *vaddress = primary_storage->vaddress;
-            auto_storage *as = auto_storage_init(constant, iaddress, vaddress);
-            for (ptr = specifier->declaration_list->next; ptr; ptr = ptr->next) {
-                declaration *node = ptr->content;
-                if (!strcmp(node->id, id)) {
-                    node->storage = as;
-                    return node;
-                }
-                else
-                    storage_add_size(as, size(node->type_list));
-            }
-            break;
+auto_storage *auto_storage_add_size_nip(auto_storage *left, struct size *right)
+{
+    int constant;
+    int iaddress = 0;
+    void *vaddress = 0;
+    if (left->constant) {
+        if (right->constant) {
+            constant = 1;
+            iaddress = left->iaddress + right->ival;
         }
-        case static_storage_t: {
-            static_storage *primary_storage = storage;
-            static_storage *ss = static_storage_init();
-            ss->relative_addr = primary_storage->relative_addr;
-            for (ptr = specifier->declaration_list->next; ptr; ptr = ptr->next) {
-                declaration *node = ptr->content;
-                if (!strcmp(node->id, id)) {
-                    node->storage = ss;
-                    return node;
-                }
-                else {
-                    struct size *thesize = size(node->type_list);
-                    if (thesize->constant)
-                        ss->relative_addr += thesize->ival;
-                    else /* error */;
-                }
-            }
-            break;
+        else {
+            constant = 0;
+            vaddress = BINARY(add, ARITHMETIC(itoa(left->iaddress), int_t), right->vval);
+        }
+    }
+    else {
+        constant = 0;
+        if (right->constant)
+            vaddress = BINARY(add, left->vaddress, ARITHMETIC(itoa(right->ival), int_t));
+        else
+            vaddress = BINARY(add, left->vaddress, right->vval);
+    }
+    return auto_storage_init(constant, iaddress, vaddress);
+}
+
+declaration *STRUCT_REF(void *primary, char *id) {
+    struct_specifier *specifier = get_type_list(primary)->content;
+    if (specifier->declaration_list) {
+        list *ptr;
+        for (ptr = specifier->declaration_list->next; ptr; ptr = ptr->next) {
+            declaration *node = ptr->content;
+            if (!strcmp(node->id, id))
+                return node;
         }
     }
 }
@@ -177,6 +176,16 @@ posinc *POSINC(void *primary, int inc) {
     return retptr;
 }
 
+funcall *FUNCALL(void *primary, list *argument_expression_list)
+{
+    funcall *retptr = malloc(sizeof(funcall));
+    retptr->type = funcall_t;
+    retptr->primary = primary;
+    retptr->argument_expression_list = argument_expression_list;
+    retptr->type_list = get_type_list(primary)->next;
+    return retptr;
+}
+
 preinc *PREINC(void *expr, int inc) {
     preinc *retptr = (preinc *)malloc(sizeof(preinc));
     retptr->type = preinc_t,
@@ -186,17 +195,23 @@ preinc *PREINC(void *expr, int inc) {
     return retptr;
 }
 
-addr *ADDR(void *expr) {
+void *ADDR(void *expr) {
+    list *type_list = get_type_list(expr);
+    if (type(type_list->content) == function_t)
+        return expr;
     addr *retptr = (addr *)malloc(sizeof(addr));
     retptr->type = addr_t;
     retptr->expr = expr;
     retptr->type_list = list_node();
     retptr->type_list->content = pointer_init();
-    retptr->type_list->next = get_type_list(expr);
+    retptr->type_list->next = type_list;
     return retptr;
 }
 
-indirection *INDIRECTION(void *expr) {
+void *INDIRECTION(void *expr) {
+    list *type_list = get_type_list(expr);
+    if (type(type_list->content) == function_t)
+        return expr;
     indirection *retptr = (indirection *)malloc(sizeof(indirection));
     retptr->type = indirection_t;
     retptr->expr = expr;
@@ -286,6 +301,8 @@ struct size *size(list *type_list)
             struct_specifier *specifier = (struct_specifier *)ptr->content;
             list *p;
             struct size *asize;
+            if (!specifier->declaration_list)
+                return 0;
             for (p = specifier->declaration_list->next; p; p = p->next) {
                 asize = size(get_type_list(p->content));
                 if (last_constant) {
@@ -396,12 +413,13 @@ if_stmt *IF_STMT(void *expr, void *statement1, void *statement2)
     return retptr;
 }
 
-switch_stmt *SWITCH_STMT(void *expr, void *statement)
+switch_stmt *SWITCH_STMT(void *expr, void *statement, char *break_tag)
 {
     switch_stmt *retptr = malloc(sizeof(switch_stmt));
     retptr->type = switch_stmt_t;
     retptr->expr = expr;
     retptr->statement = statement;
+    retptr->break_tag = break_tag;
     return retptr;
 }
 
@@ -431,6 +449,65 @@ id_labeled_stmt *ID_LABELED_STMT(char *tag, char *id, void *statement)
     retptr->tag = tag;
     retptr->id = id;
     retptr->statement = statement;
+    return retptr;
+}
+
+while_stmt *WHILE_STMT(void *expr, void *statement, int flag, char *continue_tag, char *break_tag)
+{
+    while_stmt *retptr = malloc(sizeof(while_stmt));
+    retptr->type = while_stmt_t;
+    retptr->expr = expr;
+    retptr->statement = statement;
+    retptr->flag = flag;
+    retptr->continue_tag = continue_tag;
+    retptr->break_tag = break_tag;
+    return retptr;
+}
+
+for_stmt *FOR_STMT(void *expr1, void *expr2, void *expr3, void *statement, char *continue_tag, char *break_tag)
+{
+    for_stmt *retptr = malloc(sizeof(for_stmt));
+    retptr->type = for_stmt_t;
+    retptr->expr1 = expr1;
+    retptr->expr2 = expr2;
+    retptr->expr3 = expr3;
+    retptr->statement = statement;
+    retptr->continue_tag = continue_tag;
+    retptr->break_tag = break_tag;
+    return retptr;
+}
+
+goto_stmt *GOTO_STMT(char *id, namespace_t *func_namespace)
+{
+    goto_stmt *retptr = malloc(sizeof(goto_stmt));
+    retptr->type = goto_stmt_t;
+    retptr->id = id;
+    retptr->func_namespace = func_namespace;
+    return retptr;
+}
+
+continue_stmt *CONTINUE_STMT(char *tag)
+{
+    continue_stmt *retptr = malloc(sizeof(continue_stmt));
+    retptr->type = continue_stmt_t;
+    retptr->tag = tag;
+    return retptr;
+}
+
+break_stmt *BREAK_STMT(char *tag)
+{
+    break_stmt *retptr = malloc(sizeof(break_stmt));
+    retptr->type = break_stmt_t;
+    retptr->tag = tag;
+    return retptr;
+}
+
+return_stmt *RETURN_STMT(void *expr, char *tag)
+{
+    return_stmt *retptr = malloc(sizeof(return_stmt));
+    retptr->type = return_stmt_t;
+    retptr->expr = expr;
+    retptr->tag = tag;
     return retptr;
 }
 
@@ -477,6 +554,10 @@ list *get_type_list(void *vptr)
             return ((binary *)vptr)->type_list;
         case expression_t:
             return ((expression *)vptr)->type_list;
+        case func_t:
+            return ((func *)vptr)->type_list;
+        case funcall_t:
+            return ((funcall *)vptr)->type_list;
     }
 }
 
@@ -515,6 +596,12 @@ void set_type_list(list *type_list, void *vptr)
             break;
         case expression_t:
             ((expression *)vptr)->type_list = type_list;
+            break;
+        case func_t:
+            ((func *)vptr)->type_list = type_list;
+            break;
+        case funcall_t:
+            ((funcall *)vptr)->type_list = type_list;
             break;
     }
 }

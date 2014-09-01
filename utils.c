@@ -84,14 +84,10 @@ list *list_init_wh(void *first_content) {
 void list_append(list *head, void *content) {
     list *node = list_node();
     node->content = content;
-    if (!head->next)
-        head->next = node;
-    else {
-        list *ptr = head->next;
-        while (ptr->next)
-            ptr = ptr->next;
-        ptr->next = node;
-    }
+    while (head->next)
+        head = head->next;
+    head->next = node;
+    node->prev = head;
 }
 
 void list_extend(list *first, list *second) {

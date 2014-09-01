@@ -1,26 +1,43 @@
-section .data:
-t0:
+section .data
+global _start
+t2:
 dd 32423
-t3:
+t5:
 dd 88
 dd 77
 dd 66
 dd 55
 dd 44
 dd 33
-section .bss:
-t1:
+t21:
+dd 32423
+t24:
+dd 88
+dd 77
+dd 66
+dd 55
+dd 44
+dd 33
+section .bss
+t3:
 resb 4
-t2:
+t4:
 resb 4
 resb 4
 resb 4
 resb 4
-section .text:
-function_f:
+t22:
+resb 4
+t23:
+resb 4
+resb 4
+resb 4
+resb 4
+section .text
+t0:
 push ebp
 mov ebp, esp
-mov eax, 4
+mov eax, 15
 sub esp, eax
 mov eax, 0
 mov ebx, ebp
@@ -30,14 +47,58 @@ push eax
 mov eax, 3720
 pop ebx
 mov [ebx], eax
-lea eax, [ebp+12]
-push eax
-lea eax, t0
-add eax, 0
+mov eax, 4
+mov ebx, ebp
+sub ebx, eax
+mov eax, ebx
 mov eax, [eax]
 push eax
-lea eax, t1
-add eax, 0
+mov eax, 4
+mov ebx, ebp
+sub ebx, eax
+mov eax, ebx
+push eax
+mov eax, 1
+pop ebx
+add [ebx], eax
+pop eax
+mov eax, 8
+mov ebx, ebp
+sub ebx, eax
+mov eax, ebx
+mov eax, 5
+push eax
+mov eax, 4
+push eax
+mov eax, 3
+push eax
+mov eax, t0
+call eax
+lea eax, [ebp+12]
+push eax
+mov eax, t2
+mov eax, [eax]
+push eax
+mov eax, t2
+mov eax, [eax]
+push eax
+mov eax, t3
+mov eax, [eax]
+pop ebx
+imul ebx
+push eax
+pop ebx
+imul ebx
+pop ebx
+add eax, ebx
+pop ebx
+mov [ebx], eax
+lea eax, [ebp+12]
+push eax
+mov eax, t2
+mov eax, [eax]
+push eax
+mov eax, t3
 mov eax, [eax]
 pop ebx
 imul ebx
@@ -46,9 +107,7 @@ mov eax, 8
 pop ebx
 imul ebx
 push eax
-lea eax, t3
-add eax, 0
-mov eax, [eax]
+mov eax, t5
 pop ebx
 add eax, ebx
 pop ebx
@@ -59,45 +118,472 @@ mov eax, 2
 pop ebx
 cmp ebx, eax
 setg al
-movzx eax al
-jnz t7
+movzx eax, al
+jnz t39
+t6:
 push eax
 mov eax, 432
-fild eax
+push eax
+fild dword [esp]
+pop eax
 pop ebx
-t7:
-lea eax, t1
-add eax, 0
+t39:
+mov eax, t3
 push eax
 pop ebx
 mov [ebx], eax
-lea eax, t0
-add eax, 0
+mov eax, t2
 mov eax, [eax]
 cmp eax, 3
-je t4
+je t8
 cmp eax, 4
-je t5
-jmp t6
-t4:
-lea eax, t1
-add eax, 0
+je t9
+jmp t10
+t8:
+mov eax, t3
 push eax
 mov eax, 44444
 pop ebx
 mov [ebx], eax
-t5:
-lea eax, t1
-add eax, 0
+t9:
+mov eax, t3
 push eax
 mov eax, 55555
 pop ebx
 mov [ebx], eax
-t6:
-lea eax, t1
-add eax, 0
+t10:
+mov eax, t3
 push eax
 mov eax, 66666
 pop ebx
 mov [ebx], eax
-t8
+t7:
+lea eax, [ebp+12]
+push eax
+mov eax, 0
+pop ebx
+mov [ebx], eax
+jmp t11
+t40:
+mov eax, t2
+push eax
+mov eax, 999
+push eax
+mov eax, t2
+mov eax, [eax]
+pop ebx
+add eax, ebx
+pop ebx
+mov [ebx], eax
+lea eax, [ebp+12]
+push eax
+mov eax, 1
+push eax
+lea eax, [ebp+12]
+mov eax, [eax]
+pop ebx
+add eax, ebx
+pop ebx
+mov [ebx], eax
+t11:
+lea eax, [ebp+12]
+mov eax, [eax]
+push eax
+mov eax, 10
+pop ebx
+cmp ebx, eax
+setl al
+movzx eax, al
+push eax
+mov eax, 0
+pop ebx
+cmp ebx, eax
+setg al
+movzx eax, al
+test eax, eax
+jne t40
+t12:
+jmp t13
+t41:
+jmp t15
+t42:
+mov eax, 3
+push eax
+mov eax, 2
+pop ebx
+cmp ebx, eax
+setg al
+movzx eax, al
+jnz t43
+mov eax, 2048
+jmp t1
+t43:
+t15:
+mov eax, 2
+push eax
+mov eax, 0
+pop ebx
+cmp ebx, eax
+setg al
+movzx eax, al
+test eax, eax
+jne t42
+t16:
+mov eax, 1024
+jmp t1
+t13:
+mov eax, 1
+push eax
+mov eax, 0
+pop ebx
+cmp ebx, eax
+setg al
+movzx eax, al
+test eax, eax
+jne t41
+t14:
+mov eax, 11
+mov ebx, ebp
+sub ebx, eax
+mov eax, ebx
+push eax
+mov eax, 0
+pop ebx
+mov [ebx], eax
+jmp t17
+t44:
+mov eax, 11
+mov ebx, ebp
+sub ebx, eax
+mov eax, ebx
+mov eax, [eax]
+push eax
+mov eax, 10
+pop ebx
+cmp ebx, eax
+setg al
+movzx eax, al
+jnz t45
+jmp t18
+t45:
+mov eax, 11
+mov ebx, ebp
+sub ebx, eax
+mov eax, ebx
+mov eax, [eax]
+push eax
+mov eax, 11
+mov ebx, ebp
+sub ebx, eax
+mov eax, ebx
+inc dword [eax]
+pop eax
+t17:
+mov eax, 11
+mov ebx, ebp
+sub ebx, eax
+mov eax, ebx
+mov eax, [eax]
+push eax
+mov eax, 100
+pop ebx
+cmp ebx, eax
+setl al
+movzx eax, al
+push eax
+mov eax, 0
+pop ebx
+cmp ebx, eax
+setg al
+movzx eax, al
+test eax, eax
+jne t44
+t18:
+jmp t6
+mov eax, 33333333
+jmp t1
+t1:
+leave
+ret
+t19:
+push ebp
+mov ebp, esp
+mov eax, 15
+sub esp, eax
+mov eax, 0
+mov ebx, ebp
+sub ebx, eax
+mov eax, ebx
+push eax
+mov eax, 3720
+pop ebx
+mov [ebx], eax
+mov eax, 4
+mov ebx, ebp
+sub ebx, eax
+mov eax, ebx
+mov eax, [eax]
+push eax
+mov eax, 4
+mov ebx, ebp
+sub ebx, eax
+mov eax, ebx
+push eax
+mov eax, 1
+pop ebx
+add [ebx], eax
+pop eax
+mov eax, 8
+mov ebx, ebp
+sub ebx, eax
+mov eax, ebx
+mov eax, 5
+push eax
+mov eax, 4
+push eax
+mov eax, 3
+push eax
+mov eax, t0
+call eax
+lea eax, [ebp+12]
+push eax
+mov eax, t21
+mov eax, [eax]
+push eax
+mov eax, t21
+mov eax, [eax]
+push eax
+mov eax, t22
+mov eax, [eax]
+pop ebx
+imul ebx
+push eax
+pop ebx
+imul ebx
+pop ebx
+add eax, ebx
+pop ebx
+mov [ebx], eax
+lea eax, [ebp+12]
+push eax
+mov eax, t21
+mov eax, [eax]
+push eax
+mov eax, t22
+mov eax, [eax]
+pop ebx
+imul ebx
+push eax
+mov eax, 8
+pop ebx
+imul ebx
+push eax
+mov eax, t24
+pop ebx
+add eax, ebx
+pop ebx
+mov [ebx], eax
+mov eax, 3
+push eax
+mov eax, 2
+pop ebx
+cmp ebx, eax
+setg al
+movzx eax, al
+jnz t46
+t25:
+push eax
+mov eax, 432
+push eax
+fild dword [esp]
+pop eax
+pop ebx
+t46:
+mov eax, t22
+push eax
+pop ebx
+mov [ebx], eax
+mov eax, t21
+mov eax, [eax]
+cmp eax, 3
+je t27
+cmp eax, 4
+je t28
+jmp t29
+t27:
+mov eax, t22
+push eax
+mov eax, 44444
+pop ebx
+mov [ebx], eax
+t28:
+mov eax, t22
+push eax
+mov eax, 55555
+pop ebx
+mov [ebx], eax
+t29:
+mov eax, t22
+push eax
+mov eax, 66666
+pop ebx
+mov [ebx], eax
+t26:
+lea eax, [ebp+12]
+push eax
+mov eax, 0
+pop ebx
+mov [ebx], eax
+jmp t30
+t47:
+mov eax, t21
+push eax
+mov eax, 999
+push eax
+mov eax, t21
+mov eax, [eax]
+pop ebx
+add eax, ebx
+pop ebx
+mov [ebx], eax
+lea eax, [ebp+12]
+push eax
+mov eax, 1
+push eax
+lea eax, [ebp+12]
+mov eax, [eax]
+pop ebx
+add eax, ebx
+pop ebx
+mov [ebx], eax
+t30:
+lea eax, [ebp+12]
+mov eax, [eax]
+push eax
+mov eax, 10
+pop ebx
+cmp ebx, eax
+setl al
+movzx eax, al
+push eax
+mov eax, 0
+pop ebx
+cmp ebx, eax
+setg al
+movzx eax, al
+test eax, eax
+jne t47
+t31:
+jmp t32
+t48:
+jmp t34
+t49:
+mov eax, 3
+push eax
+mov eax, 2
+pop ebx
+cmp ebx, eax
+setg al
+movzx eax, al
+jnz t50
+mov eax, 2048
+jmp t20
+t50:
+t34:
+mov eax, 2
+push eax
+mov eax, 0
+pop ebx
+cmp ebx, eax
+setg al
+movzx eax, al
+test eax, eax
+jne t49
+t35:
+mov eax, 1024
+jmp t20
+t32:
+mov eax, 1
+push eax
+mov eax, 0
+pop ebx
+cmp ebx, eax
+setg al
+movzx eax, al
+test eax, eax
+jne t48
+t33:
+mov eax, 11
+mov ebx, ebp
+sub ebx, eax
+mov eax, ebx
+push eax
+mov eax, 0
+pop ebx
+mov [ebx], eax
+jmp t36
+t51:
+mov eax, 11
+mov ebx, ebp
+sub ebx, eax
+mov eax, ebx
+mov eax, [eax]
+push eax
+mov eax, 10
+pop ebx
+cmp ebx, eax
+setg al
+movzx eax, al
+jnz t52
+jmp t37
+t52:
+mov eax, 11
+mov ebx, ebp
+sub ebx, eax
+mov eax, ebx
+mov eax, [eax]
+push eax
+mov eax, 11
+mov ebx, ebp
+sub ebx, eax
+mov eax, ebx
+inc dword [eax]
+pop eax
+t36:
+mov eax, 11
+mov ebx, ebp
+sub ebx, eax
+mov eax, ebx
+mov eax, [eax]
+push eax
+mov eax, 100
+pop ebx
+cmp ebx, eax
+setl al
+movzx eax, al
+push eax
+mov eax, 0
+pop ebx
+cmp ebx, eax
+setg al
+movzx eax, al
+test eax, eax
+jne t51
+t37:
+jmp t25
+mov eax, 33333333
+jmp t20
+t20:
+leave
+ret
+_start:
+push ebp
+mov ebp, esp
+mov eax, 0
+sub esp, eax
+mov eax, t0
+call eax
+mov eax, 0
+t38:
+leave
+ret

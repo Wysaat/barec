@@ -12,6 +12,8 @@ int data_size;
 struct namespace *namespace;
 int tab;
 
+char *continue_tag, *break_tag, *return_tag;
+
 enum types {
     auto_storage_t,
     static_storage_t,
@@ -46,8 +48,17 @@ enum types {
     case_stmt_t,
     default_stmt_t,
     id_labeled_stmt_t,
+    while_stmt_t,
+    for_stmt_t,
+    goto_stmt_t,
+    continue_stmt_t,
+    break_stmt_t,
+    return_stmt_t,
     list_t,
     static_initialization_t,
+    funcall_t,
+    func_t,
+    function_definition_type,
 };
 
 enum atypes {
@@ -71,7 +82,12 @@ typedef struct namespace {
     list *declaration_list;
     struct size *auto_size;
     struct namespace *outer;
+    list *labels;  // nonzero iff the namespace is that of a function definition
 } namespace_t;
+
+typedef struct translation_unit {
+    list *external_declarations;
+} translation_unit_t;
 
 typedef enum btype {
     mul,
@@ -117,8 +133,12 @@ typedef struct auto_storage {
 typedef struct static_storage {
     int type;
     char *tag;
-    int relative_addr;
 } static_storage;
+
+typedef struct extern_storage {
+    int type;
+    char *tag;
+} extern_storage;
 
 // storage for function parameters
 typedef struct parameter_storage {
@@ -189,6 +209,13 @@ typedef struct posinc {
     int inc;
     list *type_list;
 } posinc;
+
+typedef struct funcall {
+    int type;
+    void *primary;
+    list *argument_expression_list;
+    list *type_list;
+} funcall;
 
 typedef struct preinc {
     int type;
@@ -264,6 +291,7 @@ typedef struct switch_stmt {
     int type;
     void *expr;
     void *statement;
+    char *break_tag;
 } switch_stmt;
 
 typedef struct case_stmt {
@@ -286,13 +314,64 @@ typedef struct id_labeled_stmt {
     void *statement;
 } id_labeled_stmt;
 
+typedef struct while_stmt {
+    int type;
+    void *expr;
+    void *statement;
+    int flag;  // 0 while, 1 do-while
+    char *continue_tag;
+    char *break_tag;
+} while_stmt;
+
+typedef struct for_stmt {
+    int type;
+    void *expr1;
+    void *expr2;
+    void *expr3;
+    void *statement;
+    char *continue_tag;
+    char *break_tag;
+} for_stmt;
+
+typedef struct goto_stmt {
+    int type;
+    char *id;
+    namespace_t *func_namespace;
+} goto_stmt;
+
+typedef struct continue_stmt {
+    int type;
+    char *tag;
+} continue_stmt;
+
+typedef struct break_stmt {
+    int type;
+    char *tag;
+} break_stmt;
+
+typedef struct return_stmt {
+    int type;
+    void *expr;
+    char *tag;
+} return_stmt;
+
 typedef struct function_definition {
+    int type;
     char *id;
     list *return_type_list;
     list *parameter_list;
     namespace_t namespace;
     compound_stmt *body;
+    char *return_tag;
+    char *function_tag;
 } function_definition_t;
+
+typedef struct func {
+    int type;
+    char *id;
+    char *tag;
+    list *type_list;
+} func;
 
 /*
  * scan.c
@@ -301,7 +380,7 @@ typedef struct function_definition {
 char *scan(FILE *stream);
 
 list *parse_specifier(FILE *stream, struct namespace *namespace, int flag);
-declarator *parse_declarator(FILE *stream, int abstract, struct namespace *namespace, int is_funcdef);
+declarator *parse_declarator(FILE *stream, int abstract, struct namespace *namespace);
 void *parse_declaration(FILE *stream, struct namespace *namespace, int in_struct, int flag);
 list *parse_type_name(FILE *stream, struct namespace *namespace);
 void *parse_primary(FILE *stream, namespace_t *namespace);
@@ -322,8 +401,16 @@ void *parse_switch_stmt(FILE *stream, namespace_t *namespace);
 void *parse_case_stmt(FILE *stream, namespace_t *namespace);
 void *parse_default_stmt(FILE *stream, namespace_t *namespace);
 void *parse_id_labeled_stmt(FILE *stream, namespace_t *namespace);
+void *parse_while_stmt(FILE *stream, namespace_t *namespace);
+void *parse_do_while_stmt(FILE *stream, namespace_t *namespace);
+void *parse_for_stmt(FILE *stream, namespace_t *namespace);
+void *parse_goto_stmt(FILE *stream, namespace_t *namespace);
+void *parse_continue_stmt(FILE *stream, namespace_t *namespace);
+void *parse_break_stmt(FILE *stream, namespace_t *namespace);
+void *parse_return_stmt(FILE *stream, namespace_t *namespace);
 void error(char *message);
 void *size_to_expr(struct size *size);
+void *size_expr(list *type_list);
 
 /*
  * parse.c
@@ -332,6 +419,7 @@ void *size_to_expr(struct size *size);
 int type(void *);
 auto_storage *auto_storage_init(int constant, int iaddress, void *vaddress);
 static_storage *static_storage_init();
+extern_storage *extern_storage_init();
 arithmetic_specifier *arithmetic_specifier_init(int atype);
 struct_specifier *struct_specifier_init(char *id, list *declaration_list);
 pointer *pointer_init();
@@ -342,12 +430,13 @@ declaration *declaration_init(char *id, void *storage, list *type_list);
 parameter *parameter_init(void *storage, list *type_list);
 arithmetic *ARITHMETIC(char *value, int atype);
 string *STRING(int address, char *value);
-indirection *ARRAY_REF(void *primary, void *expr);
+void *ARRAY_REF(void *primary, void *expr);
 declaration *STRUCT_REF(void *primary, char *id);
 posinc *POSINC(void *primary, int inc);
+funcall *FUNCALL(void *primary, list *argument_expression_list);
 preinc *PREINC(void *expr, int inc);
-addr *ADDR(void *expr);
-indirection *INDIRECTION(void *expr);
+void *ADDR(void *expr);
+void *INDIRECTION(void *expr);
 unary *UNARY(void *expr, char *op);
 cast *CAST(list *type_list, cast *expr);
 binary *BINARY(btype_t btype, void *left, void *right);
@@ -356,16 +445,23 @@ expression *EXPRESSION(list *assignment_list, list *type_list);
 expression_stmt *EXPRESSION_STMT(list *assignment_list);
 compound_stmt *COMPOUND_STMT(list *declaration_statement_list, namespace_t *namespace);
 if_stmt *IF_STMT(void *expr, void *statement1, void *statement2);
-switch_stmt *SWITCH_STMT(void *expr, void *statement);
+switch_stmt *SWITCH_STMT(void *expr, void *statement, char *break_tag);
 case_stmt *CASE_STMT(char *tag, char *value, void *statement);
 default_stmt *DEFAULT_STMT(char *tag, void *statement);
 id_labeled_stmt *ID_LABELED_STMT(char *tag, char *id, void *statement);
+while_stmt *WHILE_STMT(void *expr, void *statement, int flag, char *continue_tag, char *break_tag);
+for_stmt *FOR_STMT(void *expr1, void *expr2, void *expr3, void *statement, char *continue_tag, char *break_tag);
+goto_stmt *GOTO_STMT(char *id, namespace_t *func_namespace);
+continue_stmt *CONTINUE_STMT(char *tag);
+break_stmt *BREAK_STMT(char *tag);
+return_stmt *RETURN_STMT(void *expr, char *tag);
 arithmetic_specifier *integral_promotion(arithmetic_specifier *s);
 list *integral_promotion2(list *type_list);
 list *get_type_list(void *vptr);
 void set_type_list(list *type_list, void *vptr);
 struct size *size_init(int constant, int ival, void *vval);
 struct size *size(list *type_list);
+auto_storage *auto_storage_add_size_nip(auto_storage *left, struct size *right);
 
 /*
  * utils.c

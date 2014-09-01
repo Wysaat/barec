@@ -610,3 +610,26 @@ val_list *val_list_node(char *name, int addr);
 void val_list_append(val_list *head, char *name, int addr);
 int find_addr(scope *local_scope, char *name);
 void declare(scope *local_scope, char *token);
+
+function_definition_t *parse_function_definition(FILE *stream, namespace_t *namespace)
+{
+    list *specifiers = parse_specifier(stream, namespace, 4);
+    void *storage = specifiers->next->content;
+    void *specifier = specifiers->next->next->content;
+    declarator *dcl = parse_declarator(stream, 0, namespace);
+    char *id = dcl->id;
+    char *function_tag = get_tag();
+    list *type_list = dcl->type_list;
+    list_append(func_list, func_init(id, function_tag, type_list));
+    list *ptr = type_list;
+    while (ptr->next)
+        ptr = ptr->next;
+    ptr->content = specifier;
+    list *parameter_list = ((function *)type_list->content)->parameter_list;
+    list *return_type_list = type_list->next;
+    return_type_list->prev = 0;
+    return_tag = get_tag();
+    compound_stmt *body = parse_compound_stmt(stream, namespace, list_copy(parameter_list));
+    function_definition_t *retptr = function_definition_init(id, return_type_list, parameter_list, body, return_tag, function_tag);
+    return retptr;
+}
