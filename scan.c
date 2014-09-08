@@ -5,14 +5,6 @@
 
 #define write_code(CODE, STREAM) fwrite(CODE, 1, strlen(CODE), STREAM)
 
-struct {
-    char *file_name;
-    int line;
-    int lastline_column;
-    int column;
-    int error;
-} file_info;
-
 list *func_list;
 
 static char f_fgetc(FILE *stream)
@@ -21,7 +13,7 @@ static char f_fgetc(FILE *stream)
     if (retval == '\n') {
         file_info.line++;
         file_info.lastline_column = file_info.column;
-        file_info.column = 0;
+        file_info.column = 1;
     }
     else
         file_info.column++;
@@ -39,12 +31,23 @@ void f_ungetc(char ch, FILE *stream)
         file_info.column--;
 }
 
-char *scan(FILE *stream) {
+void errorh()
+{
+    printf("%s:%d:%d: error: ", file_info.file_name, file_info.line, file_info.column);
+    file_info.error = 1;
+}
+
+char *scan(FILE *stream)
+{
     char *buffer = (char *)malloc(1024);
+    if (file_info.eof) {
+        buffer[0] = 0;
+        return buffer;
+    }
     int ch, i = 0;
     int in_old_comment = 0;
     int in_new_comment = 0;
-    while (!feof(stream)) {
+    while (1) {
         while (in_old_comment || in_new_comment) {
             ch = f_fgetc(stream);
             if (in_old_comment && ch == '*') {
@@ -56,6 +59,11 @@ char *scan(FILE *stream) {
                 in_new_comment = 0;
         }
         ch = f_fgetc(stream);
+        if (ch == EOF) {
+            file_info.column--;
+            file_info.eof = 1;
+            break;
+        }
         if (ch == '>' || ch == '<') {
             buffer[0] = ch;
             ch = f_fgetc(stream);
@@ -221,6 +229,12 @@ char *scan(FILE *stream) {
                 }
             }
         }
+        else if (ch == ' ' || ch == '\t' || ch == '\n')
+            continue;
+        // else {
+        //     errorh();
+        //     printf("stray '%c' in program\n", ch);
+        // }
     }
     buffer[0] = 0;
     return buffer;
@@ -300,10 +314,8 @@ list *parse_specifier(FILE *stream, struct namespace *namespace, int flag) {
     enum atypes atype = -1;
     while (1) {
         token = scan(stream);
-        if (!strcmp(token, "auto")) {
-            if (flag == 1 || flag == 2 || flag == 3 || flag == 4) /* error */;
+        if (!strcmp(token, "auto"))
             storage = auto_storage_init(1, 0, 0);
-        }
         else if (!strcmp(token, "static")) {
             if (flag == 2 || flag == 3) /* error */;
             storage = static_storage_init();
@@ -457,7 +469,7 @@ declarator *parse_declarator(FILE *stream, int abstract, struct namespace *names
     token = scan(stream);
     if (!strcmp(token, "(")) {
         declarator *dptr = parse_declarator(stream, abstract, namespace);
-        token = scan(stream); // token be ")" else error
+        token = scan(stream);
         id = dptr->id;
         list *nlist = dptr->type_list;
         if (nlist->next) {
@@ -726,14 +738,14 @@ void *parse_declaration(FILE *stream, namespace_t *namespace, int in_struct, int
             ptr = ptr->next;
         ptr->content = specifier;
         char *id = dptr->id;
-        if (is_declared(namespace, id))
-            /* error */;
         declaration *node;
         if (in_struct) {
             node = declaration_init(id, 0, type_list);
             list_append(namespace->declaration_list, node);
         }
         else if (type(storage) == auto_storage_t) {
+            struct size *thesize = size(type_list);
+            size_add(namespace->auto_size, thesize);
             int constant = namespace->auto_size->constant;
             int iaddress = namespace->auto_size->ival;
             void *vaddress = namespace->auto_size->vval;
@@ -756,8 +768,6 @@ void *parse_declaration(FILE *stream, namespace_t *namespace, int in_struct, int
                 type_list->content = own_specifier;
             }
             node = declaration_init(id, a_storage, type_list);
-            struct size *thesize = size(type_list);
-            size_add(namespace->auto_size, thesize);
             list_append(namespace->declaration_list, node);
         }
         else if (type(storage) == static_storage_t) {
@@ -895,8 +905,8 @@ void *parse_postfix(FILE *stream, namespace_t *namespace)
             else {
                 unscan(token, stream);
                 argument_expression_list = parse_argument_expression_list(stream, namespace);
+                token = scan(stream);
             }
-            token = scan(stream);
             primary = FUNCALL(primary, argument_expression_list);
         }
         else if (!strcmp(token, ".")) {
@@ -1351,7 +1361,6 @@ void *parse_declaration_or_statement(FILE *stream, namespace_t *namespace)
 void *parse_compound_stmt(FILE *stream, namespace_t *namespace, list *parameter_list)
 {
     char *token = scan(stream);
-    if (strcmp(token, "{")) /* error */;
     struct namespace *i_namespace = namespace_init(namespace);
     if (parameter_list) {
         i_namespace->declaration_list = parameter_list;
@@ -1369,59 +1378,12 @@ void *parse_compound_stmt(FILE *stream, namespace_t *namespace, list *parameter_
     }
 }
 
-void error(char *message)
-{
-    printf("%s:%d:%d: error: %s\n", file_info.file_name, file_info.line, file_info.column, message);
-    file_info.error = 1;
-}
-
-void statement_error(char *token, FILE *stream)
-{
-    if (!strcmp(token, ";"))
-        return;
-    else if (!strcmp(token, "}")) {
-        unscan(token, stream);
-        return;
-    }
-    int a = 0;  // {}
-    int b = 0;  // []
-    int c = 0;  // ()
-    while (1) {
-        char *token = scan(stream);
-        if (!strcmp(token, ";") && a == 0 && b == 0 && c == 0)
-            return;
-        else if (!strcmp(token, "{")) a++;
-        else if (!strcmp(token, "[")) b++;
-        else if (!strcmp(token, "(")) c++;
-        else if (!strcmp(token, "}")) {
-            if (a == 0) {
-                unscan(token, stream);
-                return;
-            }
-            else
-                a--;
-        }
-        else if (!strcmp(token, "]") && b > 0) b--;
-        else if (!strcmp(token, ")") && c > 0) c--;
-    }
-}
-
 void *parse_if_stmt(FILE *stream, namespace_t *namespace)
 {
     char *token = scan(stream);  // should be "if"
     token = scan(stream);
-    if (strcmp(token, "(")) {
-        error("expected '(' after if");
-        statement_error(token, stream);
-        return 0;
-    }
     void *expr = parse_expression(stream, namespace);
     token = scan(stream);
-    if (strcmp(token, ")")) {
-        error("expected ')'");
-        statement_error(token, stream);
-        return 0;
-    }
     void *statement = parse_statement(stream, namespace), *statement2 = 0;
     token = scan(stream);
     if (!strcmp(token, "else"))
@@ -1435,18 +1397,8 @@ void *parse_switch_stmt(FILE *stream, namespace_t *namespace)
 {
     char *token = scan(stream);  // should be "switch"
     token = scan(stream);
-    if (strcmp(token, "(")) {
-        error("expected '(' after switch");
-        statement_error(token, stream);
-        return 0;
-    }
     void *expr = parse_expression(stream, namespace);
     token = scan(stream);
-    if (strcmp(token, ")")) {
-        error("expected ')'");
-        statement_error(token, stream);
-        return 0;
-    }
     char *old_break_tag = break_tag;
     break_tag = get_tag();
     void *statement = parse_statement(stream, namespace);
@@ -1471,24 +1423,11 @@ void *parse_case_stmt(FILE *stream, namespace_t *namespace)
 {
     char *token = scan(stream);  // should be "case"
     void *expression = parse_conditional(stream, namespace);
-    char *value, *tag;
-    int err = 0;
-    if (!is_integral_constant(expression)) {
-        error("case label does not reduce to an integer constant");
-        err = 1;
-    }
-    else {
-        value = ((arithmetic *)expression)->value;
-        tag = get_tag();
-    }
+    char *value = ((arithmetic *)expression)->value;
+    char *tag = get_tag();
     token = scan(stream);
-    if (strcmp(token, ":")) {
-        error("expected ':' after case");
-        unscan(token, stream);
-        err = 1;
-    }
     void *statement = parse_statement(stream, namespace);
-    return err? 0 : CASE_STMT(tag, value, statement);
+    return CASE_STMT(tag, value, statement);
 }
 
 void *parse_default_stmt(FILE *stream, namespace_t *namespace)
@@ -1519,18 +1458,8 @@ void *parse_while_stmt(FILE *stream, namespace_t *namespace)
 {
     char *token = scan(stream);  // it should be "while"
     token = scan(stream);
-    if (strcmp(token, "(")) {
-        error("expected '(' after while");
-        statement_error(token, stream);
-        return 0;
-    }
     void *expr = parse_expression(stream, namespace);
     token = scan(stream);
-    if (strcmp(token, ")")) {
-        error("expected ')'");
-        statement_error(token, stream);
-        return 0;
-    }
     char *old_continue_tag = continue_tag;
     char *old_break_tag = break_tag;
     continue_tag = get_tag();
@@ -1551,30 +1480,10 @@ void *parse_do_while_stmt(FILE *stream, namespace_t *namespace)
     break_tag = get_tag();
     void *statement = parse_statement(stream, namespace);
     token = scan(stream);
-    if (strcmp(token, "while")) {
-        error("expected 'while'");
-        statement_error(token, stream);
-        return 0;
-    }
     token = scan(stream);
-    if (strcmp(token, "(")) {
-        error("expected '(' after while");
-        statement_error(token, stream);
-        return 0;
-    }
     void *expr = parse_expression(stream, namespace);
     token = scan(stream);
-    if (strcmp(token, ")")) {
-        error("expected ')'");
-        statement_error(token, stream);
-        return 0;
-    }
     token = scan(stream);
-    if (strcmp(token, ";")) {
-        error("expected ';'");
-        statement_error(token, stream);
-        return 0;
-    }
     while_stmt *retptr = WHILE_STMT(expr, statement, 1, continue_tag, break_tag);
     continue_tag = old_continue_tag;
     break_tag = old_break_tag;
@@ -1585,11 +1494,6 @@ void *parse_for_stmt(FILE *stream, namespace_t *namespace)
 {
     char *token = scan(stream);  // it should be "for"
     token = scan(stream);
-    if (strcmp(token, "(")) {
-        error("expected '(' after for");
-        statement_error(token, stream);
-        return 0;
-    }
     void *exprs[3];
     char *etks[] = { ";", ";", ")" };
     int i;
@@ -1601,8 +1505,6 @@ void *parse_for_stmt(FILE *stream, namespace_t *namespace)
             unscan(token, stream);
             exprs[i] = parse_expression(stream, namespace);
             token = scan(stream);
-            if (strcmp(token, exprs[i]))
-                /* error */;
         }
     }
     char *old_continue_tag = continue_tag;
@@ -1621,11 +1523,6 @@ void *parse_goto_stmt(FILE *stream, namespace_t *namespace)
     char *token = scan(stream);  // should be "goto"
     char *id = scan(stream);
     token = scan(stream);
-    if (strcmp(token, ";")) {
-        error("expected ';'");
-        statement_error(token, stream);
-        return 0;
-    }
     namespace_t *nptr = namespace;
     do {
         if (nptr->labels)
@@ -1638,11 +1535,6 @@ void *parse_continue_stmt(FILE *stream, namespace_t *namespace)
 {
     char *token = scan(stream);  // should be "continue"
     token = scan(stream);
-    if (strcmp(token, ";")) {
-        error("expected ';'");
-        statement_error(token, stream);
-        return 0;
-    }
     return CONTINUE_STMT(continue_tag);
 }
 
@@ -1650,11 +1542,6 @@ void *parse_break_stmt(FILE *stream, namespace_t *namespace)
 {
     char *token = scan(stream);  // should be "break"
     token = scan(stream);
-    if (strcmp(token, ";")) {
-        error("expected ';'");
-        statement_error(token, stream);
-        return 0;
-    }
     return BREAK_STMT(break_tag);
 }
 
@@ -1667,11 +1554,6 @@ void *parse_return_stmt(FILE *stream, namespace_t *namespace)
         unscan(token, stream);
         expr = parse_expression(stream, namespace);
         token = scan(stream);
-        if (strcmp(token, ";")) {
-            error("expected ';'");
-            statement_error(token, stream);
-            return 0;
-        }
     }
     return RETURN_STMT(expr, return_tag);
 }
@@ -1733,15 +1615,9 @@ void *parse_external_declaration(FILE *stream, namespace_t *namespace)
             ptr = ptr->next;
         ptr->content = specifier;
         char *id = dptr->id;
-        if (is_declared(namespace, id))
-            /* error */;
 
         token = scan(stream);
         if (!strcmp(token, "{")) {
-            if (!first_loop)
-                /* error */;
-            if (type(type_list->content) != function_t)
-                /* error */;
             function *f = type_list->content;
             list *ptr;
             int psize = 0;
@@ -1862,8 +1738,9 @@ int main(int argc, char **argv)
 
     file_info.file_name = ifile;
     file_info.line = 1;
-    file_info.column = 0;
+    file_info.column = 1;
     file_info.error = 0;
+    file_info.eof = 0;
 
     continue_tag = break_tag = return_tag = 0;
     func_list = list_node();
@@ -1877,9 +1754,15 @@ int main(int argc, char **argv)
     namespace = namespace_init(0);
     tab = 0;
 
-    translation_unit_t *translation_unit = parse_translation_unit(istream);
-    if (file_info.error)
+    syntax_translation_unit(istream);
+    if (file_info.error) {
+        fclose(istream);
+        fclose(ostream);
         return 0;
+    }
+
+    rewind(istream);
+    translation_unit_t *translation_unit = parse_translation_unit(istream);
     translation_unit_gencode(translation_unit);
     char *data_section = buff_puts(data_buff);
     char *bss_section = buff_puts(bss_buff);

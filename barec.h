@@ -14,6 +14,15 @@ int tab;
 
 char *continue_tag, *break_tag, *return_tag;
 
+struct {
+    char *file_name;
+    int line;
+    int lastline_column;
+    int column;
+    int error;
+    int eof;
+} file_info;
+
 enum types {
     auto_storage_t,
     static_storage_t,
@@ -408,7 +417,9 @@ void *parse_goto_stmt(FILE *stream, namespace_t *namespace);
 void *parse_continue_stmt(FILE *stream, namespace_t *namespace);
 void *parse_break_stmt(FILE *stream, namespace_t *namespace);
 void *parse_return_stmt(FILE *stream, namespace_t *namespace);
-void error(char *message);
+void error(FILE *stream, char *message);
+void error_message(char *message);
+void statement_error(char *token, FILE *stream);
 void *size_to_expr(struct size *size);
 void *size_expr(list *type_list);
 
@@ -511,5 +522,21 @@ inline int is_qualifier(char *token);
 
 void gencode(void *expr);
 void function_definition_gencode(function_definition_t *function_definition);
+
+/*
+ * check.c
+ */
+
+void syntax_declarator(FILE *stream, int abstract);
+void syntax_declaration(FILE *stream, int flag);
+void syntax_conditional(FILE *stream);
+void syntax_assignment(FILE *stream);
+void syntax_expression(FILE *stream);
+void syntax_expression_stmt(FILE *stream);
+void syntax_statement(FILE *stream);
+void syntax_declaration_or_statement(FILE *stream);
+void syntax_compound_stmt(FILE *stream);
+void syntax_external_declaration(FILE *stream);
+void syntax_translation_unit(FILE *stream);
 
 #endif /* SCAN_H */

@@ -4,6 +4,8 @@
 #include "barec.h"
 
 void unscan(char *token, FILE *stream) {
+    if (!*token)
+        return;
     char *ptr = token;
     while (*ptr)
         ptr++;
