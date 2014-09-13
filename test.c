@@ -1,8 +1,6 @@
-double double double f(int a, int b)
+int main()
 {
-    int x;
-    x = x.#[33][3](3,);
-    x = x.[];
-    int y;
-    y(x, a,x.33);
+    static int a[][4][5] = { {1}, 2, 3 };
+    int b[][4][5] = { {1}, 2, 3 };
+    // int c[][4][5] = {{}};
 }

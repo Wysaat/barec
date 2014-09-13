@@ -28,6 +28,9 @@ void declaration_gencode(declaration *expr)
                     break;
             }
             break;
+        case enum_type:
+            buff_add(text_buff, "mov eax, [eax]\n");
+            break;
     }
 }
 
@@ -216,6 +219,14 @@ void preinc_gencode(preinc *expr)
     }
 }
 
+void union_ref_gencode(union_ref_t *expr)
+{
+    list *old_type_list = get_type_list(expr->primary);
+    set_type_list(expr->primary, expr->type_list);
+    gencode(expr->primary);
+    set_type_list(expr->primary, old_type_list);
+}
+
 static void gencode_and_push_argument(void *expr)
 {
     list *type_list = get_type_list(expr);
@@ -313,6 +324,10 @@ void addr_gencode(addr *expr)
     else if (type(expr->expr) == indirection_t) {
         indirection *ind = expr->expr;
         gencode(ind->expr);
+    }
+    else if (type(expr->expr) == union_ref_type) {
+        union_ref_t *uni = expr->expr;
+        gencode(ADDR(uni->primary));
     }
 }
 
@@ -791,6 +806,23 @@ void binary_gencode(binary *expr)
     }
 }
 
+void conditional_gencode(conditional_t *expr)
+{
+    gencode(expr->expr1);
+    char *tag1 = get_tag();
+    buff_add(text_buff, "jz ");
+    buff_addln(text_buff, tag1);
+    gencode(expr->expr2);
+    char *tag2 = get_tag();
+    buff_add(text_buff, "jmp ");
+    buff_addln(text_buff, tag2);
+    buff_add(text_buff, tag1);
+    buff_add(text_buff, ":\n");
+    gencode(expr->expr3);
+    buff_add(text_buff, tag2);
+    buff_add(text_buff, ":\n");
+}
+
 void assignment_gencode(assignment *expr)
 {
     gencode(ADDR(expr->expr1));
@@ -851,7 +883,7 @@ static inline char *constant_value(void *constant)
     }
 }
 
-static void sig_subproc1(void *body)
+static inline void sig_subproc1(void *body)
 {
     if (type(body) == compound_stmt_t) {
         compound_stmt *stmt = body;
@@ -871,7 +903,7 @@ static void sig_subproc1(void *body)
     }
 }
 
-static void sig_subproc2(void *body)
+static inline void sig_subproc2(void *body)
 {
     if (type(body) == compound_stmt_t) {
         compound_stmt *stmt = body;
@@ -1122,6 +1154,7 @@ void gencode(void *expr)
         case arithmetic_t: arithmetic_gencode(expr); break;
         case string_t: string_gencode(expr); break;
         case posinc_t: posinc_gencode(expr); break;
+        case union_ref_type: union_ref_gencode(expr); break;
         case funcall_t: funcall_gencode(expr); break;
         case addr_t: addr_gencode(expr); break;
         case indirection_t: indirection_gencode(expr); break;
@@ -1129,6 +1162,7 @@ void gencode(void *expr)
         case unary_t: unary_gencode(expr); break;
         case cast_t: cast_gencode(expr); break;
         case binary_t: binary_gencode(expr); break;
+        case conditional_type: conditional_gencode(expr); break;
         case assignment_t: assignment_gencode(expr); break;
         case expression_t: expression_gencode(expr); break;
         case expression_stmt_t: expression_stmt_gencode(expr); break;

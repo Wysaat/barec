@@ -46,16 +46,16 @@ char *itoa(int value) {
         return "0";
     }
     while (num > 0) {
-        num = num / 10;
+        num /= 10;
         n++;
     }
 
-    char *retptr = (char *)malloc(n+1);
+    char *retptr = malloc(n+1);
     retptr[n] = 0;
     int i;
     for (i = 1; i <= n; i++) {
         retptr[n-i] = value%10 + '0';
-        value = value / 10;
+        value /= 10;
     }
     return retptr;
 }
@@ -154,7 +154,7 @@ char *get_tag()
 }
 
 static char *type_specifiers[] = {
-    "void", "char", "short", "int", "long", "float", "double", "signed", "unsigend", 0
+    "typedef", "void", "char", "short", "int", "long", "float", "double", "signed", "unsigend", 0
 };
 
 int is_specifier(char *token)

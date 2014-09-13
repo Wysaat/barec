@@ -724,18 +724,18 @@ static is_zero(void *expr)
     return 0;
 }
 
-static void *parse_initializer(FILE *stream, namespace_t *namespace)
+static list *parse_initializer(FILE *stream, namespace_t *namespace)
 {
+    list *retptr = list_node();
     char *token = scan(stream);
     int initialized = 0;
     if (!strcmp(token, "{")) {
-        list *retptr = list_node();
         token = scan(stream);
         if (!strcmp(token, "}"))
-            return retptr;
+            return 0;
         unscan(token, stream);
         while (1) {
-            void *val = parse_initializer(stream, namespace);
+            list *val = parse_initializer(stream, namespace);
             if (val)
                 initialized = 1;
             list_append(retptr, val);
@@ -750,7 +750,7 @@ static void *parse_initializer(FILE *stream, namespace_t *namespace)
                 if (initialized)
                     return retptr;
                 else
-                    return list_node();
+                    return 0;
             }
         }
     }
@@ -759,46 +759,27 @@ static void *parse_initializer(FILE *stream, namespace_t *namespace)
         void *expr = parse_assignment(stream, namespace);
         if (is_zero(expr))
             return 0;
-        return expr;
+        list_append(retptr, expr);
+        return retptr;
     }
 }
 
-int list_len(list *head) {
-    int len = 0;
-    while (head = head->next)
-        len++;
-    return len;
-}
-
-static void *initializing(void *node, void *initializer)
+static void *initializing(void *node, list *initializer)
 {
     switch (type(get_type_list(node)->content)) {
         case arithmetic_specifier_t: case enum_type: case pointer_t: case function_t: {
             void *aval;
             if (initializer) {
-                if (type(initializer) == list_t)
-                    return initializing(node, ((list *)initializer)->next->content);
-                else
-                    return ASSIGNMENT(node, initializer);
+                aval = initializer->next->content;
+                if (type(aval) == list_t)
+                    aval = ((list *)aval)->next->content;
             }
             else
-                return ASSIGNMENT(node, ARITHMETIC(strdup("0"), int_t));
+                aval = 0;
+            return ASSIGNMENT(node, aval);
         }
         case array_t: {
             array *a = (array *)get_type_list(node)->content;
-            void *content_s = get_type_list(node)->next->content;
-            int subsize = -1;
-            if (type(content_s) == array_t) {
-                array *a = content_s;
-                subsize = atoi(((arithmetic *)a->size)->value);
-            }
-            else if (type(content_s) == struct_specifier_t) {
-                struct_specifier *s = content_s;
-                if (s->declaration_list)
-                    subsize = list_len(s->declaration_list);
-                else
-                    subsize = 0;
-            }
             if (a->size) {
                 if (type(a->size) == arithmetic_t) {
                     arithmetic *arith = (arithmetic *)a->size;
@@ -809,32 +790,11 @@ static void *initializing(void *node, void *initializer)
                         list *ptr;
                         list *stmts = list_node();
                         if (initializer) {
-                            for (i = 0, ptr = ((list *)initializer)->next; i < size; i++) {
-                                void *inival;
-                                if (ptr && ptr->content && type(ptr->content) == list_t) {
+                            for (i = 0, ptr = initializer->next; i < size; i++) {
+                                void *inival = 0;
+                                if (ptr) {
                                     inival = ptr->content;
                                     ptr = ptr->next;
-                                }
-                                else if (subsize >= 0) {
-                                    int i = 0;
-                                    list *sub_initializer = list_node();
-                                    while (i++ < subsize) {
-                                        if (!ptr)
-                                            list_append(sub_initializer, 0);
-                                        else {
-                                            list_append(sub_initializer, ptr->content);
-                                            ptr = ptr->next;
-                                        }
-                                    }
-                                    inival = sub_initializer;
-                                }
-                                else {
-                                    if (!ptr)
-                                        inival = 0;
-                                    else {
-                                        inival = ptr->content;
-                                        ptr = ptr->next;
-                                    }
                                 }
                                 void *ap = initializing(ARRAY_REF(node, ARITHMETIC(strdup(itoa(i)), int_t)), inival);
                                 if (ap)
@@ -856,98 +816,28 @@ static void *initializing(void *node, void *initializer)
                 list *ptr;
                 int i;
                 list *stmts = list_node();
-                for (ptr = ((list *)initializer)->next, i = 0; ptr; i++) {
-                    void *inival;
-                    if (type(ptr->content) == list_t) {
-                        inival = ptr->content;
-                        ptr = ptr->next;
-                    }
-                    else if (subsize >= 0) {
-                        list *sub_initializer = list_node();
-                        int i = 0;
-                        while (i++ < subsize) {
-                            if (!ptr)
-                                list_append(sub_initializer, 0);
-                            else {
-                                list_append(sub_initializer, ptr->content);
-                                ptr = ptr->next;
-                            }
-                        }
-                        inival = sub_initializer;
-                    }
-                    else {
-                        inival = ptr->content;
-                        ptr = ptr->next;
-                    }
-                    void *ap = initializing(ARRAY_REF(node, ARITHMETIC(strdup(itoa(i)), int_t)), inival);
-                    if (ap)
-                        list_append(stmts, ap);
+                for (ptr = initializer->next, i = 0; ptr; ptr = ptr->next, i++) {
+                    list_append(stmts, initializing(ARRAY_REF(node, ARITHMETIC(strdup(itoa(i)), int_t)), ptr->content));
                 }
-                a->size = ARITHMETIC(itoa(i), int_t);
                 return COMPOUND_STMT(stmts, 0);
             }
         }
         case struct_specifier_t: {
             struct_specifier *specifier = get_type_list(node)->content;
+            list *stmts = list_node();
+            list *ptr1, *ptr2 = 0;
             if (!specifier->declaration_list)
                 return 0;
-            list *stmts = list_node();
-            list *ptr;
-            if (initializer) {
-                list *ptr2 = ((list *)initializer)->next;
-                for (ptr = specifier->declaration_list->next; ptr; ptr = ptr->next) {
-                    declaration *node = ptr->content;
-                    void *s = node->type_list->content;
-                    void *inival;
-                    int subsize = -1;
-                    if (type(s) == array_t) {
-                        array *a = s;
-                        subsize = atoi(((arithmetic *)a->size)->value);
-                    }
-                    else if (type(s) == struct_specifier_t) {
-                        struct_specifier *ss = s;
-                        if (ss->declaration_list)
-                            subsize = list_len(ss->declaration_list);
-                        else
-                            subsize = 0;
-                    }
-
-                    if (ptr2 && type(ptr2) == list_t) {
-                        inival = ptr2->content;
-                        ptr2 = ptr2->next;
-                    }
-                    else if (subsize >= 0) {
-                        list *sub_initializer = list_node();
-                        int i = 0;
-                        while (i++ < subsize) {
-                            if (!ptr2)
-                                list_append(sub_initializer, 0);
-                            else {
-                                list_append(sub_initializer, ptr2->content);
-                                ptr2 = ptr2->next;
-                            }
-                        }
-                        inival = sub_initializer;
-                    }
-                    else {
-                        if (!ptr2)
-                            inival = 0;
-                        else {
-                            inival = ptr2->content;
-                            ptr2 = ptr2->next;
-                        }
-                    }
-                    void *ap = initializing(node, inival);
-                    if (ap)
-                        list_append(stmts, ap);
+            if (initializer)
+                ptr2 = initializer->next;
+            for (ptr1 = specifier->declaration_list->next; ptr1; ptr1 = ptr1->next) {
+                void *inival = 0;
+                if (ptr2) {
+                    inival = ptr2->content;
+                    ptr2 = ptr2->next;
                 }
-            }
-            else {
-                for (ptr = specifier->declaration_list->next; ptr; ptr = ptr->next) {
-                    void *ap = initializing(node, 0);
-                    if (ap)
-                        list_append(stmts, ap);
-                }
+                declaration *node = ptr1->content;
+                list_append(stmts, initializing(node, inival));
             }
             return COMPOUND_STMT(stmts, 0);
         }
@@ -1025,7 +915,6 @@ void *parse_declaration(FILE *stream, namespace_t *namespace, int in_struct, int
     if (!strcmp(token, ";"))
         return 0;
     unscan(token, stream);
-    list *stmt_list = list_node();
     while (1) {
         declarator *dptr = parse_declarator(stream, 0, namespace);
         list *type_list = dptr->type_list;
@@ -1050,44 +939,36 @@ void *parse_declaration(FILE *stream, namespace_t *namespace, int in_struct, int
         if (!in_struct && type(storage) == typedef_storage_t)
             list_append(namespace->typedefs, typedef_init(id, type_list));
         declaration *node;
-        int array_no_size = 0;
         if (in_struct) {
             node = declaration_init(id, 0, type_list);
             list_append(namespace->declaration_list, node);
         }
         else if (type(storage) == auto_storage_t) {
-            if (type(type_list->content) == array_t && !((array *)type_list->content)->size) {
-                node = declaration_init(id, 0, type_list);
-                list_append(namespace->declaration_list, node);
-                array_no_size = 1;
-            }
-            else {
-                struct size *thesize = size(type_list);
-                size_add(namespace->auto_size, thesize);
-                int constant = namespace->auto_size->constant;
-                int iaddress = namespace->auto_size->ival;
-                void *vaddress = namespace->auto_size->vval;
-                auto_storage *a_storage = auto_storage_init(constant, iaddress, vaddress);
-                if (type(type_list->content) == struct_specifier_t) {
-                    auto_storage *s = a_storage;
-                    struct_specifier *old_specifier = type_list->content;
-                    list *old_declaration_list = old_specifier->declaration_list;
-                    list *declaration_list = 0;
-                    if (old_declaration_list) {
-                        declaration_list = list_node();
-                        list *ptr;
-                        for (ptr = old_declaration_list->next; ptr; ptr = ptr->next) {
-                            declaration *od = ptr->content;
-                            list_append(declaration_list, declaration_init(od->id, s, od->type_list));
-                            s = auto_storage_add_size_nip(s, size(od->type_list));
-                        }
+            struct size *thesize = size(type_list);
+            size_add(namespace->auto_size, thesize);
+            int constant = namespace->auto_size->constant;
+            int iaddress = namespace->auto_size->ival;
+            void *vaddress = namespace->auto_size->vval;
+            auto_storage *a_storage = auto_storage_init(constant, iaddress, vaddress);
+            if (type(type_list->content) == struct_specifier_t) {
+                auto_storage *s = a_storage;
+                struct_specifier *old_specifier = type_list->content;
+                list *old_declaration_list = old_specifier->declaration_list;
+                list *declaration_list = 0;
+                if (old_declaration_list) {
+                    declaration_list = list_node();
+                    list *ptr;
+                    for (ptr = old_declaration_list->next; ptr; ptr = ptr->next) {
+                        declaration *od = ptr->content;
+                        list_append(declaration_list, declaration_init(od->id, s, od->type_list));
+                        s = auto_storage_add_size_nip(s, size(od->type_list));
                     }
-                    struct_specifier *own_specifier = struct_specifier_init(old_specifier->id, declaration_list);
-                    type_list->content = own_specifier;
                 }
-                node = declaration_init(id, a_storage, type_list);
-                list_append(namespace->declaration_list, node);
+                struct_specifier *own_specifier = struct_specifier_init(old_specifier->id, declaration_list);
+                type_list->content = own_specifier;
             }
+            node = declaration_init(id, a_storage, type_list);
+            list_append(namespace->declaration_list, node);
         }
         else if (type(storage) == static_storage_t) {
             static_storage *s_storage = static_storage_init();
@@ -1117,39 +998,28 @@ void *parse_declaration(FILE *stream, namespace_t *namespace, int in_struct, int
         }
         token = scan(stream);
         if (!strcmp(token, ","))
-            ;
+            continue;
         else if (!strcmp(token, "=")) {
             list *initializer = parse_initializer(stream, namespace);
-            void *stmt = initializing(node, initializer);
-            if (array_no_size) {
-                struct size *thesize = size(type_list);
-                size_add(namespace->auto_size, thesize);
-                int constant = namespace->auto_size->constant;
-                int iaddress = namespace->auto_size->ival;
-                void *vaddress = namespace->auto_size->vval;
-                auto_storage *a_storage = auto_storage_init(constant, iaddress, vaddress);
-                node->storage = a_storage;
-            }
-            if (type(node->storage) == static_storage_t) {
-                int initialized = initializer ? 1 : 0;
-                char *tag = ((static_storage *)node->storage)->tag;
-                compound_stmt *body;
-                if (type(stmt) == compound_stmt_t)
-                    body = stmt;
-                else {
-                    list *stmts = list_node();
-                    list_append(stmts, stmt);
-                    body = COMPOUND_STMT(stmts, 0);
-                }
-                list_append(stmt_list, static_initialization_init(tag, body, initialized));
-            }
-            else
-                list_append(stmt_list, stmt);
             token = scan(stream);
-            if (!strcmp(token, ","))
-                ;
-            else if (!strcmp(token, ";"))
-                break;
+            if (!strcmp(token, ";")) {
+                void *stmt = initializing(node, initializer);
+                compound_stmt *body;
+                if (type(node->storage) == static_storage_t) {
+                    int initialized = initializer ? 1 : 0;
+                    char *tag = ((static_storage *)node->storage)->tag;
+                    if (type(stmt) == compound_stmt_t)
+                        body = stmt;
+                    else {
+                        list *stmts = list_node();
+                        list_append(stmts, stmt);
+                        body = COMPOUND_STMT(stmts, 0);
+                    }
+                    return static_initialization_init(tag, body, initialized);
+                }
+                else
+                    return stmt;
+            }
         }
         else if (!strcmp(token, ";")) {
             if (!in_struct && type(storage) == static_storage_t) {
@@ -1157,12 +1027,11 @@ void *parse_declaration(FILE *stream, namespace_t *namespace, int in_struct, int
                 list *stmts = list_node();
                 list_append(stmts, ASSIGNMENT(node, 0));
                 compound_stmt *body = COMPOUND_STMT(stmts, 0);
-                list_append(stmt_list, static_initialization_init(tag, body, 0));
-                break;
+                return static_initialization_init(tag, body, 0);
             }
+            return 0;
         }
     }
-    return COMPOUND_STMT(stmt_list, 0);
 }
 
 list *parse_type_name(FILE *stream, struct namespace *namespace)

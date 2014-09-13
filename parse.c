@@ -43,6 +43,14 @@ struct_specifier *struct_specifier_init(char *id, list *declaration_list) {
     return retptr;
 }
 
+union_specifier *union_specifier_init(char *id, list *declaration_list) {
+    union_specifier *retptr = malloc(sizeof(union_specifier));
+    retptr->type = union_specifier_t;
+    retptr->id = id;
+    retptr->declaration_list = declaration_list;
+    return retptr;
+}
+
 pointer *pointer_init() {
     pointer *retptr = (pointer *)malloc(sizeof(pointer));
     retptr->type = pointer_t;
@@ -294,15 +302,22 @@ struct size *size(list *type_list)
                 vval = BINARY(mul, vval, ARITHMETIC(itoa(arith_size(ptr->content)), int_t));
             return size_init(constant, ival, vval);
         }
+        case enum_type: {
+            if (constant)
+                ival *= 4;
+            else
+                vval = BINARY(mul, vval, ARITHMETIC("4", int_t));
+            return size_init(constant, ival, vval);
+        }
         case struct_specifier_t: {
-            int last_ival = 1;
-            void *last_vval = ARITHMETIC(strdup("1"), int_t);
+            int last_ival = 0;
+            void *last_vval = ARITHMETIC(strdup("0"), int_t);
             int last_constant = 1;
             struct_specifier *specifier = (struct_specifier *)ptr->content;
             list *p;
             struct size *asize;
             if (!specifier->declaration_list)
-                return 0;
+                return size_init(1, 0, 0);
             for (p = specifier->declaration_list->next; p; p = p->next) {
                 asize = size(get_type_list(p->content));
                 if (last_constant) {
@@ -336,10 +351,49 @@ struct size *size(list *type_list)
             }
             return size_init(constant, ival, vval);
         }
+        case union_specifier_t: {
+            union_specifier *specifier = (union_specifier *)ptr->content;
+            list *p;
+            struct size *asize;
+            int last_ival = 0;
+            void *last_vval = ARITHMETIC(strdup("0"), int_t);
+            int last_constant;
+            if (!specifier->declaration_list)
+                return size_init(1, 0, 0);
+            for (p = specifier->declaration_list->next; p; p = p->next) {
+                asize = size(get_type_list(p->content));
+                if (last_constant) {
+                    if (asize->constant)
+                        if (asize->ival > last_ival)
+                            last_ival = asize->ival;
+                    else {
+                        // to be supported
+                    }
+                }
+                else {
+                    // to be supported
+                }
+            }
+            if (constant) {
+                if (last_constant)
+                    ival *= last_ival;
+                else {
+                    vval = BINARY(mul, ARITHMETIC(itoa(ival), int_t), last_vval);
+                    constant = 0;
+                }
+            }
+            else {
+                if (last_constant)
+                    vval = BINARY(mul, vval, ARITHMETIC(itoa(last_ival), int_t));
+                else
+                    vval = BINARY(mul, vval, last_vval);
+            }
+            return size_init(constant, ival, vval);
+        }
     }
 }
 
-cast *CAST(list *type_list, cast *expr)
+cast *CAST(list *type_list, void *expr)
 {
     cast *retptr = (cast *)malloc(sizeof(cast));
     retptr->type = cast_t;
@@ -558,6 +612,10 @@ list *get_type_list(void *vptr)
             return ((func *)vptr)->type_list;
         case funcall_t:
             return ((funcall *)vptr)->type_list;
+        case union_ref_type:
+            return ((union_ref_t *)vptr)->type_list;
+        case conditional_type:
+            return ((conditional_t *)vptr)->type_list;
     }
 }
 
@@ -603,5 +661,10 @@ void set_type_list(list *type_list, void *vptr)
         case funcall_t:
             ((funcall *)vptr)->type_list = type_list;
             break;
+        case union_ref_type:
+            ((union_ref_t *)vptr)->type_list = type_list;
+            break;
+        case conditional_type:
+            ((conditional_t *)vptr)->type_list = type_list;
     }
 }

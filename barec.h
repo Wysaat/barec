@@ -30,6 +30,7 @@ enum types {
     parameter_storage_t,
     arithmetic_specifier_t,
     struct_specifier_t,
+    union_specifier_t,
     pointer_t,
     array_t,
     function_t,
@@ -40,7 +41,6 @@ enum types {
     declaration_t,
     arithmetic_t,
     string_t,
-    struct_ref_t,
     posinc_t,
     preinc_t,
     addr_t,
@@ -68,6 +68,11 @@ enum types {
     funcall_t,
     func_t,
     function_definition_type,
+    typedef_type,
+    typedef_storage_t,
+    enum_type,
+    union_ref_type,
+    conditional_type,
 };
 
 enum atypes {
@@ -88,11 +93,45 @@ enum atypes {
 
 typedef struct namespace {
     list *struct_s_list;
+    list *union_s_list;
     list *declaration_list;
     struct size *auto_size;
     struct namespace *outer;
     list *labels;  // nonzero iff the namespace is that of a function definition
+    list *typedefs;
+    list *enums;
 } namespace_t;
+
+typedef struct {
+    int type;
+    void *expr1;
+    void *expr2;
+    void *expr3;
+    list *type_list;
+} conditional_t;
+
+typedef struct {
+    int type;
+    void *primary;
+    list *type_list;
+} union_ref_t;
+
+typedef struct {
+    int type;
+    char *id;
+    list *type_list;
+} typedef_t;
+
+typedef struct {
+    char *id;
+    int value;
+} enumerator_t;
+
+typedef struct {
+    int type;
+    char *id;
+    list *enumerators;
+} enum_t;
 
 typedef struct translation_unit {
     list *external_declarations;
@@ -132,6 +171,10 @@ struct size {
     void *vval;
 };
 
+typedef struct typedef_storage {
+    int type;
+} typedef_storage;
+
 typedef struct auto_storage {
     int type;
     int constant;
@@ -165,6 +208,12 @@ typedef struct struct_specifier {
     char *id;
     list *declaration_list;
 } struct_specifier;
+
+typedef struct union_specifier {
+    int type;
+    char *id;
+    list *declaration_list;
+} union_specifier;
 
 typedef struct pointer {
     int type;
@@ -255,7 +304,7 @@ typedef struct unary {
 typedef struct cast {
     int type;
     list *type_list;
-    struct cast *expr;
+    void *expr;
 } cast;
 
 typedef struct binary {
@@ -433,6 +482,7 @@ static_storage *static_storage_init();
 extern_storage *extern_storage_init();
 arithmetic_specifier *arithmetic_specifier_init(int atype);
 struct_specifier *struct_specifier_init(char *id, list *declaration_list);
+union_specifier *union_specifier_init(char *id, list *declaration_list);
 pointer *pointer_init();
 array *array_init(void *size);
 function *function_init(list *parameter_list);
@@ -449,7 +499,7 @@ preinc *PREINC(void *expr, int inc);
 void *ADDR(void *expr);
 void *INDIRECTION(void *expr);
 unary *UNARY(void *expr, char *op);
-cast *CAST(list *type_list, cast *expr);
+cast *CAST(list *type_list, void *expr);
 binary *BINARY(btype_t btype, void *left, void *right);
 assignment *ASSIGNMENT(void *expr1, void *expr2);
 expression *EXPRESSION(list *assignment_list, list *type_list);
@@ -529,6 +579,9 @@ void function_definition_gencode(function_definition_t *function_definition);
 
 void syntax_declarator(FILE *stream, int abstract);
 void syntax_declaration(FILE *stream, int flag);
+void syntax_postfix(FILE *stream);
+void syntax_unary(FILE *stream);
+void syntax_cast(FILE *stream);
 void syntax_conditional(FILE *stream);
 void syntax_assignment(FILE *stream);
 void syntax_expression(FILE *stream);
@@ -536,6 +589,18 @@ void syntax_expression_stmt(FILE *stream);
 void syntax_statement(FILE *stream);
 void syntax_declaration_or_statement(FILE *stream);
 void syntax_compound_stmt(FILE *stream);
+void syntax_if_stmt(FILE *stream);
+void syntax_switch_stmt(FILE *stream);
+void syntax_case_stmt(FILE *stream);
+void syntax_default_stmt(FILE *stream);
+void syntax_id_labeled_stmt(FILE *stream);
+void syntax_while_stmt(FILE *stream);
+void syntax_do_while_stmt(FILE *stream);
+void syntax_for_stmt(FILE *stream);
+void syntax_goto_stmt(FILE *stream);
+void syntax_continue_stmt(FILE *stream);
+void syntax_break_stmt(FILE *stream);
+void syntax_return_stmt(FILE *stream);
 void syntax_external_declaration(FILE *stream);
 void syntax_translation_unit(FILE *stream);
 
