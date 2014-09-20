@@ -73,6 +73,7 @@ enum types {
     enum_type,
     union_ref_type,
     conditional_type,
+    not_lvalue,
 };
 
 enum atypes {
@@ -101,6 +102,12 @@ typedef struct namespace {
     list *typedefs;
     list *enums;
 } namespace_t;
+
+typedef struct aconstant {
+    int is_int;
+    int ival;
+    double fval;
+} aconstant_t;
 
 typedef struct {
     int type;
@@ -437,9 +444,9 @@ typedef struct func {
 
 char *scan(FILE *stream);
 
-list *parse_specifier(FILE *stream, struct namespace *namespace, int flag);
+list *parse_specifier(FILE *stream, struct namespace *namespace);
 declarator *parse_declarator(FILE *stream, int abstract, struct namespace *namespace);
-void *parse_declaration(FILE *stream, struct namespace *namespace, int in_struct, int flag);
+void *parse_declaration(FILE *stream, struct namespace *namespace, int in_struct);
 list *parse_type_name(FILE *stream, struct namespace *namespace);
 void *parse_primary(FILE *stream, namespace_t *namespace);
 void *parse_postfix(FILE *stream, namespace_t *namespace);
@@ -471,6 +478,22 @@ void error_message(char *message);
 void statement_error(char *token, FILE *stream);
 void *size_to_expr(struct size *size);
 void *size_expr(list *type_list);
+aconstant_t *parse_a_conditional(FILE *stream);
+arithmetic *parse_arithmetic_constant(FILE *stream);
+enumerator_t *enumerator_init(char *id, int value);
+typedef_storage *typedef_storage_init();
+struct namespace *namespace_init(namespace_t *outer);
+struct_specifier *find_struct_specifier(namespace_t *namespace, char *id);
+union_specifier *find_union_specifier(namespace_t *namespace, char *id);
+declaration *find_declaration(namespace_t *namespace, char *id);
+void *find_identifier(namespace_t *namespace, char *id);
+typedef_t *find_typedef(namespace_t *namespace, char *id);
+enum_t *find_enum(namespace_t *namespace, char *id);
+enumerator_t *find_enumerator(namespace_t *namespace, char *id);
+enum_t *enum_init(char *id, list *enumerators);
+list *parse_parameter_list(FILE *stream, struct namespace *namespace);
+typedef_t *typedef_init(char *id, list *type_list);
+void errorh();
 
 /*
  * parse.c
@@ -486,7 +509,7 @@ union_specifier *union_specifier_init(char *id, list *declaration_list);
 pointer *pointer_init();
 array *array_init(void *size);
 function *function_init(list *parameter_list);
-declarator *declartor_init(char *id, list *type_list);
+declarator *declarator_init(char *id, list *type_list);
 declaration *declaration_init(char *id, void *storage, list *type_list);
 parameter *parameter_init(void *storage, list *type_list);
 arithmetic *ARITHMETIC(char *value, int atype);
@@ -577,31 +600,34 @@ void function_definition_gencode(function_definition_t *function_definition);
  * check.c
  */
 
-void syntax_declarator(FILE *stream, int abstract);
-void syntax_declaration(FILE *stream, int flag);
-void syntax_postfix(FILE *stream);
-void syntax_unary(FILE *stream);
-void syntax_cast(FILE *stream);
-void syntax_conditional(FILE *stream);
-void syntax_assignment(FILE *stream);
-void syntax_expression(FILE *stream);
-void syntax_expression_stmt(FILE *stream);
-void syntax_statement(FILE *stream);
-void syntax_declaration_or_statement(FILE *stream);
-void syntax_compound_stmt(FILE *stream);
-void syntax_if_stmt(FILE *stream);
-void syntax_switch_stmt(FILE *stream);
-void syntax_case_stmt(FILE *stream);
-void syntax_default_stmt(FILE *stream);
-void syntax_id_labeled_stmt(FILE *stream);
-void syntax_while_stmt(FILE *stream);
-void syntax_do_while_stmt(FILE *stream);
-void syntax_for_stmt(FILE *stream);
-void syntax_goto_stmt(FILE *stream);
-void syntax_continue_stmt(FILE *stream);
-void syntax_break_stmt(FILE *stream);
-void syntax_return_stmt(FILE *stream);
-void syntax_external_declaration(FILE *stream);
+declarator *syntax_declarator(FILE *stream, namespace_t *namespace, int abstract);
+void syntax_declaration(FILE *stream, namespace_t *namespace);
+list *syntax_postfix(FILE *stream, namespace_t *namespace);
+list *syntax_unary(FILE *stream, namespace_t *namespace);
+list *syntax_cast(FILE *stream, namespace_t *namespace);
+void syntax_conditional(FILE *stream, namespace_t *namespace);
+void syntax_assignment(FILE *stream, namespace_t *namespace);
+list *syntax_expression(FILE *stream, namespace_t *namespace);
+void syntax_expression_stmt(FILE *stream, namespace_t *namespace);
+void syntax_statement(FILE *stream, namespace_t *namespace);
+void syntax_declaration_or_statement(FILE *stream, namespace_t *namespace);
+void syntax_compound_stmt(FILE *stream, namespace_t *namespace);
+void syntax_if_stmt(FILE *stream, namespace_t *namespace);
+void syntax_switch_stmt(FILE *stream, namespace_t *namespace);
+void syntax_case_stmt(FILE *stream, namespace_t *namespace);
+void syntax_default_stmt(FILE *stream, namespace_t *namespace);
+void syntax_id_labeled_stmt(FILE *stream, namespace_t *namespace);
+void syntax_while_stmt(FILE *stream, namespace_t *namespace);
+void syntax_do_while_stmt(FILE *stream, namespace_t *namespace);
+void syntax_for_stmt(FILE *stream, namespace_t *namespace);
+void syntax_goto_stmt(FILE *stream, namespace_t *namespace);
+void syntax_continue_stmt(FILE *stream, namespace_t *namespace);
+void syntax_break_stmt(FILE *stream, namespace_t *namespace);
+void syntax_return_stmt(FILE *stream, namespace_t *namespace);
+void syntax_external_declaration(FILE *stream, namespace_t *namespace);
 void syntax_translation_unit(FILE *stream);
+void syntax_a_conditional(FILE *stream);
+void error_message_np(int line, int column, char *message);
+void errorh_np(int line, int column);
 
 #endif /* SCAN_H */

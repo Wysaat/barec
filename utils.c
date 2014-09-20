@@ -29,7 +29,7 @@ inline int is_int(char *token) {
 }
 
 inline int is_float(char *token) {
-    if (!(*token >= '0' || *token <= '9') && *token != '.')
+    if (!(*token >= '0' && *token <= '9') && *token != '.')
         return 0;
     while (*token) {
         if (*token == '.' || *token == 'e' || *token == 'E')

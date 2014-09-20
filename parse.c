@@ -71,7 +71,7 @@ function *function_init(list *parameter_list) {
     return retptr;
 }
 
-declarator *declartor_init(char *id, list *type_list) {
+declarator *declarator_init(char *id, list *type_list) {
     declarator *retptr = (declarator *)malloc(sizeof(declarator));
     retptr->type = declarator_t;
     retptr->id = id;
@@ -116,7 +116,17 @@ string *STRING(int address, char *value) {
 }
 
 void *ARRAY_REF(void *primary, void *expr) {
-    void *expr2 = BINARY(add, primary, expr);
+    list *llist = get_type_list(primary), *rlist = get_type_list(expr);
+    int lt = type(llist->content), rt = type(rlist->content);
+    void *expr2;
+    if (lt == pointer_t || lt == array_t) {
+        void *size = size_expr(llist->next);
+        expr2 = BINARY(add, primary, BINARY(mul, expr, size));
+    }
+    else {
+        void *size = size_expr(rlist->next);
+        expr2 = BINARY(add, expr, BINARY(mul, primary, size));
+    }
     return INDIRECTION(expr2);
 }
 

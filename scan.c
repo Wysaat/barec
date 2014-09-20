@@ -245,7 +245,7 @@ char *scan(FILE *stream)
     return buffer;
 }
 
-static struct_specifier *find_struct_specifier(namespace_t *namespace, char *id)
+struct_specifier *find_struct_specifier(namespace_t *namespace, char *id)
 {
     struct namespace *nptr;
     list *ptr;
@@ -259,7 +259,7 @@ static struct_specifier *find_struct_specifier(namespace_t *namespace, char *id)
     return 0;
 }
 
-static union_specifier *find_union_specifier(namespace_t *namespace, char *id)
+union_specifier *find_union_specifier(namespace_t *namespace, char *id)
 {
     struct namespace *nptr;
     list *ptr;
@@ -273,7 +273,7 @@ static union_specifier *find_union_specifier(namespace_t *namespace, char *id)
     return 0;
 }
 
-static declaration *find_declaration(namespace_t *namespace, char *id)
+declaration *find_declaration(namespace_t *namespace, char *id)
 {
     struct namespace *nptr;
     list *ptr;
@@ -287,7 +287,7 @@ static declaration *find_declaration(namespace_t *namespace, char *id)
     return 0;
 }
 
-static void *find_identifier(namespace_t *namespace, char *id)
+void *find_identifier(namespace_t *namespace, char *id)
 {
     struct namespace *nptr;
     list *ptr;
@@ -306,7 +306,7 @@ static void *find_identifier(namespace_t *namespace, char *id)
     return 0;
 }
 
-static typedef_t *find_typedef(namespace_t *namespace, char *id)
+typedef_t *find_typedef(namespace_t *namespace, char *id)
 {
     namespace_t *nptr;
     list *ptr;
@@ -320,7 +320,7 @@ static typedef_t *find_typedef(namespace_t *namespace, char *id)
     return 0;
 }
 
-static enum_t *find_enum(namespace_t *namespace, char *id)
+enum_t *find_enum(namespace_t *namespace, char *id)
 {
     namespace_t *nptr;
     list *ptr;
@@ -334,7 +334,7 @@ static enum_t *find_enum(namespace_t *namespace, char *id)
     return 0;
 }
 
-static enumerator_t *find_enumerator(namespace_t *namespace, char *id)
+enumerator_t *find_enumerator(namespace_t *namespace, char *id)
 {
     namespace_t *nptr;
     list *ptr;
@@ -352,7 +352,7 @@ static enumerator_t *find_enumerator(namespace_t *namespace, char *id)
     return 0;
 }
 
-static struct namespace *namespace_init(struct namespace *outer)
+struct namespace *namespace_init(namespace_t *outer)
 {
     struct namespace *retptr = (struct namespace *)malloc(sizeof(struct namespace));
     retptr->declaration_list = list_node();
@@ -429,7 +429,7 @@ list *parse_enumerator_body(FILE *stream, namespace_t *namespace)
     }
 }
 
-list *parse_specifier(FILE *stream, namespace_t *namespace, int flag)
+list *parse_specifier(FILE *stream, namespace_t *namespace)
 {
     char *token;
     void *storage = 0, *specifier = 0;
@@ -437,6 +437,7 @@ list *parse_specifier(FILE *stream, namespace_t *namespace, int flag)
     int sign = 1;
     enum atypes atype = -1;
     int void_specifier = 0;
+    int got_specifier = 0;
     while (1) {
         token = scan(stream);
         if (!strcmp(token, "typedef"))
@@ -444,37 +445,51 @@ list *parse_specifier(FILE *stream, namespace_t *namespace, int flag)
         else if (!strcmp(token, "auto"))
             storage = auto_storage_init(1, 0, 0);
         else if (!strcmp(token, "static")) {
-            if (flag == 2 || flag == 3) /* error */;
             storage = static_storage_init();
         }
-        else if (!strcmp(token, "void"))
+        else if (!strcmp(token, "void")) {
+            got_specifier = 1;
             void_specifier = 1;
-        else if (!strcmp(token, "char"))
+        }
+        else if (!strcmp(token, "char")) {
+            got_specifier = 1;
             atype = char_t;
-        else if (!strcmp(token, "short"))
+        }
+        else if (!strcmp(token, "short")) {
+            got_specifier = 1;
             atype = short_t;
-        else if (!strcmp(token, "int"))
+        }
+        else if (!strcmp(token, "int")) {
+            got_specifier = 1;
             atype = int_t;
+        }
         else if (!strcmp(token, "long")) {
+            got_specifier = 1;
             if (atype == long_t)
                 atype = long_long_t;
             else if (atype == -1 || atype == int_t)
                 atype = long_t;
         }
-        else if (!strcmp(token, "float"))
+        else if (!strcmp(token, "float")) {
+            got_specifier = 1;
             atype = float_t;
+        }
         else if (!strcmp(token, "double")) {
+            got_specifier = 1;
             if (atype = long_t)
                 atype = long_double_t;
             else if (atype == -1)
                 atype = double_t;
         }
-        else if (!strcmp(token, "unsigned"))
+        else if (!strcmp(token, "unsigned")) {
             sign = 0;
-        else if (!strcmp(token, "signed"))
+        }
+        else if (!strcmp(token, "signed")) {
             sign = 1;
+        }
         else if (!strcmp(token, "struct") || !strcmp(token, "union")) {
-            int is_struct = !strcmp(token, "struct") ? 1 : 0;
+            got_specifier = 1;
+            int is_struct = !strcmp(token, "struct");
             token = scan(stream);
             if (is_id(token)) {
                 char *id = token;
@@ -492,7 +507,7 @@ list *parse_specifier(FILE *stream, namespace_t *namespace, int flag)
                         struct namespace *s_namespace = namespace_init(namespace);
                         while (strcmp((token = scan(stream)), "}")) {
                             unscan(token, stream);
-                            parse_declaration(stream, s_namespace, 1, 2);
+                            parse_declaration(stream, s_namespace, 1);
                         }
                         if (is_struct)
                             specifier = struct_specifier_init(id, s_namespace->declaration_list);
@@ -526,7 +541,7 @@ list *parse_specifier(FILE *stream, namespace_t *namespace, int flag)
                     unscan(token, stream);
                     while (strcmp((token = scan(stream)), "}")) {
                         unscan(token, stream);
-                        parse_declaration(stream, s_namespace, 1, 2);
+                        parse_declaration(stream, s_namespace, 1);
                     }
                     if (is_struct)
                         specifier = struct_specifier_init(0, s_namespace->declaration_list);
@@ -536,6 +551,7 @@ list *parse_specifier(FILE *stream, namespace_t *namespace, int flag)
             }
         }
         else if (!strcmp(token, "enum")) {
+            got_specifier = 1;
             token = scan(stream);
             if (is_id(token)) {
                 char *id = token;
@@ -557,7 +573,7 @@ list *parse_specifier(FILE *stream, namespace_t *namespace, int flag)
             }
         }
         // CAUTION!!! convert enum to int before comparing
-        else if (is_id(token) && !specifier && !void_specifier && (int)atype < 0) {
+        else if (!got_specifier && sign == -1) {
             typedef_t *t = find_typedef(namespace, token);
             specifier = t->type_list;
         }
@@ -566,18 +582,17 @@ list *parse_specifier(FILE *stream, namespace_t *namespace, int flag)
             break;
         }
     }
-    if (!specifier && !void_specifier) {
-        if (!sign) {
-            switch (atype) {
-                case char_t: atype = unsigned_char_t; break;
-                case short_t: atype = unsigned_short_t; break;
-                case int_t: atype = unsigned_int_t; break;
-                case long_t: atype = unsigned_long_t; break;
-                case long_long_t: atype = unsigned_long_long_t; break;
-            }
+    if (!sign) {
+        switch (atype) {
+            case char_t: atype = unsigned_char_t; break;
+            case short_t: atype = unsigned_short_t; break;
+            case int_t: atype = unsigned_int_t; break;
+            case long_t: atype = unsigned_long_t; break;
+            case long_long_t: atype = unsigned_long_long_t; break;
         }
-        specifier = arithmetic_specifier_init(atype);
     }
+    if (!specifier && atype >= 0)
+        specifier = arithmetic_specifier_init(atype);
     list_append(retptr, storage);
     list_append(retptr, specifier);
     return retptr;
@@ -600,7 +615,7 @@ list *parse_parameter_list(FILE *stream, struct namespace *namespace)
     if (!strcmp(token, ")"))
         return retptr;
     while (1) {
-        list *specifiers = parse_specifier(stream, namespace, 3);
+        list *specifiers = parse_specifier(stream, namespace);
         void *storage = specifiers->next->content;
         void *specifier = specifiers->next->next->content;
         declarator *d = parse_declarator(stream, abstract, namespace);
@@ -696,8 +711,10 @@ declarator *parse_declarator(FILE *stream, int abstract, struct namespace *names
             while (ptr->next)
                 ptr = ptr->next;
             ptr->next = type_list;
+            type_list->prev = ptr;
             type_list = new_type_list->next;
-            return declartor_init(id, type_list);
+            type_list->prev = 0;
+            return declarator_init(id, type_list);
         }
     }
 }
@@ -1002,25 +1019,13 @@ typedef_t *typedef_init(char *id, list *type_list)
     return retptr;
 }
 
-/*
- * flag == 0 : internal declaration
- * flag == 1 : external declaration
- * flag == 2 : struct-declaration
- */
-
-void *parse_declaration(FILE *stream, namespace_t *namespace, int in_struct, int flag)
+void *parse_declaration(FILE *stream, namespace_t *namespace, int in_struct)
 {
-    list *specifiers = parse_specifier(stream, namespace, flag);
+    list *specifiers = parse_specifier(stream, namespace);
     void *storage = specifiers->next->content;
     void *specifier = specifiers->next->next->content;
-    if (flag == 0 && !storage)
+    if (!storage)
         storage = auto_storage_init(1, 0, 0);
-    if (!storage) {
-        if (flag == 0)
-            storage = auto_storage_init(1, 0, 0);
-        else if (flag == 1)
-            storage = static_storage_init();
-    }
     char *token = scan(stream);
     if (!strcmp(token, ";"))
         return 0;
@@ -1158,8 +1163,8 @@ void *parse_declaration(FILE *stream, namespace_t *namespace, int in_struct, int
                 list_append(stmts, ASSIGNMENT(node, 0));
                 compound_stmt *body = COMPOUND_STMT(stmts, 0);
                 list_append(stmt_list, static_initialization_init(tag, body, 0));
-                break;
             }
+            break;
         }
     }
     return COMPOUND_STMT(stmt_list, 0);
@@ -1167,7 +1172,7 @@ void *parse_declaration(FILE *stream, namespace_t *namespace, int in_struct, int
 
 list *parse_type_name(FILE *stream, struct namespace *namespace)
 {
-    list *specifiers = parse_specifier(stream, namespace, 2);
+    list *specifiers = parse_specifier(stream, namespace);
     void *specifier = specifiers->next->next->content;
     declarator *dptr = parse_declarator(stream, 1, namespace);
     list *type_list = dptr->type_list;
@@ -1181,12 +1186,16 @@ list *parse_type_name(FILE *stream, struct namespace *namespace)
 void *parse_primary(FILE *stream, namespace_t *namespace)
 {
     char *token = scan(stream);
-    if (is_int(token))
-        return ARITHMETIC(token, int_t);
+    if (is_int(token)) {
+        unscan(token, stream);
+        return parse_arithmetic_constant(stream);
+    }
     else if (is_char(token))
         return ARITHMETIC(token, char_t);
-    else if (is_float(token))
-        return ARITHMETIC(token, float_t);
+    else if (is_float(token)) {
+        unscan(token, stream);
+        return parse_arithmetic_constant(stream);
+    }
     else if (is_str(token)) {
         char *value = token + 1;
         value[strlen(value)] = 0;
@@ -1201,6 +1210,11 @@ void *parse_primary(FILE *stream, namespace_t *namespace)
         void *retptr = find_identifier(namespace, token);
         if (retptr)
             return retptr;
+    }
+    else if (!strcmp(token, "(")) {
+        void *retptr = parse_expression(stream, namespace);
+        token = scan(stream);
+        return retptr;
     }
 }
 
@@ -1247,11 +1261,8 @@ void *parse_postfix(FILE *stream, namespace_t *namespace)
     while (1) {
         token = scan(stream);
         if (!strcmp(token, "[")) {
-            int t = type(get_type_list(primary)->content);
-            if (t == array_t || t == pointer_t) {
-                primary = ARRAY_REF(primary, parse_expression(stream, namespace));
-                token = scan(stream);
-            }
+            primary = ARRAY_REF(primary, parse_expression(stream, namespace));
+            token = scan(stream);
         }
         else if (!strcmp(token, "(")) {
             token = scan(stream);
@@ -1325,7 +1336,15 @@ void *parse_unary(FILE *stream, namespace_t *namespace)
     else if (!strcmp(token, "sizeof")) {
         token = scan(stream);
         if (!strcmp(token, "(")) {
-            // type_name or expression;
+            token = scan(stream);
+            unscan(token, stream);
+            list *type_list;
+            if (is_specifier(token) || is_qualifier(token) || find_typedef(namespace, token))
+                type_list = parse_type_name(stream, namespace);
+            else
+                type_list = get_type_list(parse_expression(stream, namespace));
+            token = scan(stream);
+            return size_expr(type_list);
         }
         else {
             unscan(token, stream);
@@ -1343,10 +1362,18 @@ void *parse_cast(FILE *stream, namespace_t *namespace)
 {
     char *token = scan(stream);
     if (!strcmp(token, "(")) {
-        list *type_list = parse_type_name(stream, namespace);
         token = scan(stream);
-        if (!strcmp(token, ")"))
-            return CAST(type_list, parse_cast(stream, namespace));
+        unscan(token, stream);
+        if (is_specifier(token) || is_qualifier(token) || find_typedef(namespace, token)) {
+            list *type_list = parse_type_name(stream, namespace);
+            token = scan(stream);
+            if (!strcmp(token, ")"))
+                return CAST(type_list, parse_cast(stream, namespace));
+        }
+        else {
+            unscan("(", stream);
+            parse_primary(stream, namespace);
+        }
     }
     else {
         unscan(token, stream);
@@ -1744,6 +1771,9 @@ void *parse_expression_stmt(FILE *stream, namespace_t *namespace)
 
 void *parse_statement(FILE *stream, struct namespace *namespace)
 {
+    int offset = ftell(stream);
+    int line = file_info.line;
+    int column = file_info.column;
     char *token = scan(stream);
     unscan(token, stream);
     if (!strcmp(token, "{"))
@@ -1770,10 +1800,10 @@ void *parse_statement(FILE *stream, struct namespace *namespace)
         return parse_return_stmt(stream, namespace);
     else if (is_id(token)) {
         token = scan(stream);
-        char *token2 = scan(stream);
-        unscan(token2, stream);
-        unscan(token, stream);
-        if (!strcmp(token2, ":"))
+        fseek(stream, offset, SEEK_SET);
+        file_info.line = line;
+        file_info.column = column;
+        if (!strcmp(token, ":"))
             return parse_id_labeled_stmt(stream, namespace);
         else
             return parse_expression_stmt(stream, namespace);
@@ -1787,7 +1817,7 @@ void *parse_declaration_or_statement(FILE *stream, namespace_t *namespace)
     char *token = scan(stream);
     unscan(token, stream);
     if (is_specifier(token) || is_storage(token) || is_qualifier(token) || find_typedef(namespace, token))
-        return parse_declaration(stream, namespace, 0, 0);
+        return parse_declaration(stream, namespace, 0);
     return parse_statement(stream, namespace);
 }
 
@@ -2030,7 +2060,7 @@ func_init(char *id, char *tag, list *type_list)
 
 void *parse_external_declaration(FILE *stream, namespace_t *namespace)
 {
-    list *specifiers = parse_specifier(stream, namespace, 4);
+    list *specifiers = parse_specifier(stream, namespace);
     void *storage = specifiers->next->content;
     void *specifier = specifiers->next->next->content;
     if (!storage)
@@ -2177,6 +2207,652 @@ translation_unit_t *parse_translation_unit(FILE *stream)
     }
     return translation_unit_init(external_declarations);
 }
+
+aconstant_t *aconstant_init(int is_int, int ival, double fval)
+{
+    aconstant_t *retptr = malloc(sizeof(aconstant_t));
+    retptr->is_int = is_int;
+    retptr->ival = ival;
+    retptr->fval = fval;
+    return retptr;
+}
+
+aconstant_t *parse_aconstant(FILE *stream)
+{
+    long offset = ftell(stream);
+    int line = file_info.line;
+    int column = file_info.column;
+
+    char *token = scan(stream);
+    int is_int_flag;
+    int ival;
+    double fval;
+    if (is_int(token)) {
+        ival = atoi(token);
+        is_int_flag = 1;
+    }
+    else if (is_float(token)) {
+        fval = atof(token);
+        is_int_flag = 0;
+    }
+    else if (!strcmp(token, "(")) {
+        aconstant_t *retptr = parse_a_conditional(stream);
+        if (!retptr) {
+            unscan(token, stream);
+            return 0;
+        }
+        else {
+            token = scan(stream);
+            if (!strcmp(token, ")"))
+                return retptr;
+            else {
+                fseek(stream, offset, SEEK_SET);
+                file_info.line = line;
+                file_info.column = column;
+                return 0;
+            }
+        }
+    }
+    else {
+        unscan(token, stream);
+        return 0;
+    }
+    return aconstant_init(is_int_flag, ival, fval);
+}
+
+aconstant_t *parse_a_unary(FILE *stream)
+{
+    char *token = scan(stream);
+    if (!strcmp(token, "+")) {
+        aconstant_t *primary = parse_aconstant(stream);
+        if (!primary) {
+            unscan(token, stream);
+            return 0;
+        }
+        else
+            return primary;
+    }
+    else if (!strcmp(token, "-")) {
+        aconstant_t *primary = parse_aconstant(stream);
+        if (!primary) {
+            unscan(token, stream);
+            return 0;
+        }
+        else {
+            if (primary->is_int)
+                primary->ival = -primary->ival;
+            else
+                primary->fval = -primary->fval;
+            return primary;
+        }
+    }
+    else if (!strcmp(token, "!")) {
+        aconstant_t *primary = parse_aconstant(stream);
+        if (!primary) {
+            unscan(token, stream);
+            return 0;
+        }
+        else {
+            if (primary->is_int)
+                return aconstant_init(1, !primary->ival, 0);
+            else
+                return aconstant_init(1, !primary->fval, 0);
+        }
+    }
+    else if (!strcmp(token, "~")) {
+        aconstant_t *primary = parse_aconstant(stream);
+        if (!primary) {
+            unscan(token, stream);
+            return 0;
+        }
+        else {
+            if (primary->is_int)
+                return aconstant_init(1, ~primary->ival, 0);
+        }
+    }
+    else {
+        unscan(token, stream);
+        return parse_aconstant(stream);
+    }
+}
+
+aconstant_t *parse_a_m_expr(FILE *stream)
+{
+    aconstant_t *left = parse_a_unary(stream);
+    if (!left)
+        return 0;
+    while (1) {
+        char *token = scan(stream);
+        if (!strcmp(token, "*")) {
+            aconstant_t *right = parse_a_unary(stream);
+            if (right) {
+                if (left->is_int) {
+                    if (right->is_int)
+                        return aconstant_init(1, left->ival * right->ival, 0);
+                    else
+                        return aconstant_init(0, 0, left->ival * right->fval);
+                }
+                else {
+                    if (right->is_int)
+                        return aconstant_init(0, 0, left->fval * right->ival);
+                    else
+                        return aconstant_init(0, 0, left->fval * right->fval);
+                }
+            }
+            else {
+                unscan(token, stream);
+                return left;
+            }
+        }
+        else if (!strcmp(token, "/")) {
+            aconstant_t *right = parse_a_unary(stream);
+            if (right) {
+                if (left->is_int) {
+                    if (right->is_int)
+                        return aconstant_init(1, left->ival / right->ival, 0);
+                    else
+                        return aconstant_init(0, 0, left->ival / right->fval);
+                }
+                else {
+                    if (right->is_int)
+                        return aconstant_init(0, 0, left->fval / right->ival);
+                    else
+                        return aconstant_init(0, 0, left->fval / right->fval);
+                }
+            }
+            else {
+                unscan(token, stream);
+                return left;
+            }
+        }
+        else if (!strcmp(token, "%")) {
+            aconstant_t *right = parse_a_unary(stream);
+            if (right) {
+                if (left->is_int) {
+                    if (right->is_int)
+                        return aconstant_init(1, left->ival * right->ival, 0);
+                }
+            }
+            else {
+                unscan(token, stream);
+                return left;
+            }
+        }
+        else {
+            unscan(token, stream);
+            return left;
+        }
+    }
+}
+
+
+aconstant_t *parse_a_a_expr(FILE *stream)
+{
+    aconstant_t *left = parse_a_m_expr(stream);
+    if (!left)
+        return 0;
+    while (1) {
+        char *token = scan(stream);
+        if (!strcmp(token, "+")) {
+            aconstant_t *right = parse_a_m_expr(stream);
+            if (right) {
+                if (left->is_int) {
+                    if (right->is_int)
+                        return aconstant_init(1, left->ival + right->ival, 0);
+                    else
+                        return aconstant_init(0, 0, left->ival + right->fval);
+                }
+                else {
+                    if (right->is_int)
+                        return aconstant_init(0, 0, left->fval + right->ival);
+                    else
+                        return aconstant_init(0, 0, left->fval + right->fval);
+                }
+            }
+            else {
+                unscan(token, stream);
+                return left;
+            }
+        }
+        else if (!strcmp(token, "-")) {
+            aconstant_t *right = parse_a_m_expr(stream);
+            if (right) {
+                if (left->is_int) {
+                    if (right->is_int)
+                        return aconstant_init(1, left->ival - right->ival, 0);
+                    else
+                        return aconstant_init(0, 0, left->ival - right->fval);
+                }
+                else {
+                    if (right->is_int)
+                        return aconstant_init(0, 0, left->fval - right->ival);
+                    else
+                        return aconstant_init(0, 0, left->fval - right->fval);
+                }
+            }
+            else {
+                unscan(token, stream);
+                return left;
+            }
+        }
+        else {
+            unscan(token, stream);
+            return left;
+        }
+    }
+}
+
+aconstant_t *parse_a_shift(FILE *stream)
+{
+    aconstant_t *left = parse_a_a_expr(stream);
+    if (!left)
+        return 0;
+    while (1) {
+        char *token = scan(stream);
+        if (!strcmp(token, ">>")) {
+            aconstant_t *right = parse_a_a_expr(stream);
+            if (right) {
+                if (left->is_int) {
+                    if (right->is_int)
+                        left = aconstant_init(1, left->ival >> right->ival, 0);
+                }
+            }
+            else {
+                unscan(token, stream);
+                return left;
+            }
+        }
+        else if (!strcmp(token, "<<")) {
+            aconstant_t *right = parse_a_a_expr(stream);
+            if (right) {
+                if (left->is_int) {
+                    if (right->is_int)
+                        left = aconstant_init(1, left->ival << right->ival, 0);
+                }
+            }
+            else {
+                unscan(token, stream);
+                return left;
+            }
+        }
+        else {
+            unscan(token, stream);
+            return left;
+        }
+    }
+}
+
+aconstant_t *parse_a_relational(FILE *stream)
+{
+    aconstant_t *left = parse_a_shift(stream);
+    if (!left)
+        return 0;
+    while (1) {
+        char *token = scan(stream);
+        if (!strcmp(token, "<")) {
+            aconstant_t *right = parse_a_shift(stream);
+            if (right) {
+                if (left->is_int) {
+                    if (right->is_int)
+                        left = aconstant_init(1, left->ival < right->ival, 0);
+                    else
+                        left = aconstant_init(1, left->ival < right->fval, 0);
+                }
+                else {
+                    if (right->is_int)
+                        left = aconstant_init(1, left->fval < right->ival, 0);
+                    else
+                        left = aconstant_init(1, left->fval < right->fval, 0);
+                }
+            }
+            else {
+                unscan(token, stream);
+                return left;
+            }
+        }
+        else if (!strcmp(token, ">")) {
+            aconstant_t *right = parse_a_shift(stream);
+            if (right) {
+                if (left->is_int) {
+                    if (right->is_int)
+                        left = aconstant_init(1, left->ival > right->ival, 0);
+                    else
+                        left = aconstant_init(1, left->ival > right->fval, 0);
+                }
+                else {
+                    if (right->is_int)
+                        left = aconstant_init(1, left->fval > right->ival, 0);
+                    else
+                        left = aconstant_init(1, left->fval > right->fval, 0);
+                }
+            }
+            else {
+                unscan(token, stream);
+                return left;
+            }
+        }
+        else if (!strcmp(token, "<=")) {
+            aconstant_t *right = parse_a_shift(stream);
+            if (right) {
+                if (left->is_int) {
+                    if (right->is_int)
+                        left = aconstant_init(1, left->ival <= right->ival, 0);
+                    else
+                        left = aconstant_init(1, left->ival <= right->fval, 0);
+                }
+                else {
+                    if (right->is_int)
+                        left = aconstant_init(1, left->fval <= right->ival, 0);
+                    else
+                        left = aconstant_init(1, left->fval <= right->fval, 0);
+                }
+            }
+            else {
+                unscan(token, stream);
+                return left;
+            }
+        }
+        else if (!strcmp(token, ">=")) {
+            aconstant_t *right = parse_a_shift(stream);
+            if (right) {
+                if (left->is_int) {
+                    if (right->is_int)
+                        left = aconstant_init(1, left->ival >= right->ival, 0);
+                    else
+                        left = aconstant_init(1, left->ival >= right->fval, 0);
+                }
+                else {
+                    if (right->is_int)
+                        left = aconstant_init(1, left->fval >= right->ival, 0);
+                    else
+                        left = aconstant_init(1, left->fval >= right->fval, 0);
+                }
+            }
+            else {
+                unscan(token, stream);
+                return left;
+            }
+        }
+        else {
+            unscan(token, stream);
+            return left;
+        }
+    }
+}
+
+aconstant_t *parse_a_equality(FILE *stream)
+{
+    aconstant_t *left = parse_a_relational(stream);
+    if (!left)
+        return 0;
+    while (1) {
+        char *token = scan(stream);
+        if (!strcmp(token, "==") || !strcmp(token, "!=")) {
+            aconstant_t *right = parse_a_relational(stream);
+            if (right) {
+                if (!strcmp(token, "==")) {
+                    if (left->is_int) {
+                        if (right->is_int)
+                            left = aconstant_init(1, left->ival == right->ival, 0);
+                        else
+                            left = aconstant_init(1, left->ival == right->fval, 0);
+                    }
+                    else {
+                        if (right->is_int)
+                            left = aconstant_init(1, left->fval == right->ival, 0);
+                        else
+                            left = aconstant_init(1, left->fval == right->fval, 0);
+                    }
+                }
+            }
+            else {
+                unscan(token, stream);
+                return left;
+            }
+        }
+        else {
+            unscan(token, stream);
+            return left;
+        }
+    }
+}
+
+aconstant_t *parse_a_and(FILE *stream)
+{
+    aconstant_t *left = parse_a_equality(stream);
+    if (!left)
+        return 0;
+    while (1) {
+        char *token = scan(stream);
+        if (!strcmp(token, "&")) {
+            aconstant_t *right = parse_a_equality(stream);
+            if (right) {
+                if (left->is_int) {
+                    if (right->is_int)
+                        left = aconstant_init(1, left->ival & right->ival, 0);
+                }
+            }
+            else {
+                unscan(token, stream);
+                return left;
+            }
+        }
+        else {
+            unscan(token, stream);
+            return left;
+        }
+    }
+}
+
+aconstant_t *parse_a_xor(FILE *stream)
+{
+    aconstant_t *left = parse_a_and(stream);
+    if (!left)
+        return 0;
+    while (1) {
+        char *token = scan(stream);
+        if (!strcmp(token, "^")) {
+            aconstant_t *right = parse_a_and(stream);
+            if (right) {
+                if (left->is_int) {
+                    if (right->is_int)
+                        left = aconstant_init(1, left->ival ^ right->ival, 0);
+                }
+            }
+            else {
+                unscan(token, stream);
+                return left;
+            }
+        }
+        else {
+            unscan(token, stream);
+            return left;
+        }
+    }
+}
+
+aconstant_t *parse_a_or(FILE *stream)
+{
+    aconstant_t *left = parse_a_xor(stream);
+    if (!left)
+        return 0;
+    while (1) {
+        char *token = scan(stream);
+        if (!strcmp(token, "|")) {
+            aconstant_t *right = parse_a_xor(stream);
+            if (right) {
+                if (left->is_int) {
+                    if (right->is_int)
+                        left = aconstant_init(1, left->ival | right->ival, 0);
+                }
+            }
+            else {
+                unscan(token, stream);
+                return left;
+            }
+        }
+        else {
+            unscan(token, stream);
+            return left;
+        }
+    }
+}
+
+aconstant_t *parse_a_logical_and(FILE *stream)
+{
+    aconstant_t *left = parse_a_or(stream);
+    if (!left)
+        return 0;
+    while (1) {
+        char *token = scan(stream);
+        if (!strcmp(token, "&&")) {
+            aconstant_t *right = parse_a_or(stream);
+            if (right) {
+                if (left->is_int) {
+                    if (right->is_int)
+                        left = aconstant_init(1, left->ival && right->ival, 0);
+                    else
+                        left = aconstant_init(1, left->ival && right->fval, 0);
+                }
+                else {
+                    if (right->is_int)
+                        left = aconstant_init(1, left->fval && right->ival, 0);
+                    else
+                        left = aconstant_init(1, left->fval && right->fval, 0);
+                }
+            }
+            else {
+                unscan(token, stream);
+                return left;
+            }
+        }
+        else {
+            unscan(token, stream);
+            return left;
+        }
+    }
+}
+
+aconstant_t *parse_a_logical_or(FILE *stream)
+{
+    aconstant_t *left = parse_a_logical_and(stream);
+    if (!left)
+        return 0;
+    while (1) {
+        char *token = scan(stream);
+        if (!strcmp(token, "||")) {
+            aconstant_t *right = parse_a_logical_and(stream);
+            if (right) {
+                if (left->is_int) {
+                    if (right->is_int)
+                        left = aconstant_init(1, left->ival || right->ival, 0);
+                    else
+                        left = aconstant_init(1, left->ival || right->fval, 0);
+                }
+                else {
+                    if (right->is_int)
+                        left = aconstant_init(1, left->fval || right->ival, 0);
+                    else
+                        left = aconstant_init(1, left->fval || right->fval, 0);
+                }
+            }
+            else {
+                unscan(token, stream);
+                return left;
+            }
+        }
+        else {
+            unscan(token, stream);
+            return left;
+        }
+    }
+}
+
+aconstant_t *parse_a_conditional(FILE *stream)
+{
+    aconstant_t *cond = parse_a_logical_or(stream);
+    if (!cond)
+        return 0;
+    char *token = scan(stream);
+    if (!strcmp(token, "?")) {
+        long offset = ftell(stream);
+        int line = file_info.line;
+        int column = file_info.column;
+        aconstant_t *first = parse_a_conditional(stream);
+        if (first) {
+            token = scan(stream);
+            if (!strcmp(token, ":")) {
+                aconstant_t *second = parse_a_conditional(stream);
+                if (second) {
+                    token = scan(stream);
+                    char *atks[] = {
+                        "?", "||", "&&", "|", "^", "&", "==", "!=", "<", ">",
+                        "<=", ">=", "<<", ">>", "+", "-", "*", "/", "%", 0,
+                    };
+                    char **ptr;
+                    for (ptr = atks; *ptr; ptr++) {
+                        if (!strcmp(token, *ptr)) {
+                            fseek(stream, offset, SEEK_SET);
+                            file_info.line = line;
+                            file_info.column = column;
+                            return cond;
+                        }
+                    }
+                    unscan(token, stream);
+                    if (cond->is_int) {
+                        if (cond->ival)
+                            return first;
+                        else
+                            return second;
+                    }
+                    else {
+                        if (cond->fval)
+                            return first;
+                        else
+                            return second;
+                    }
+                }
+                else {
+                    fseek(stream, offset, SEEK_SET);
+                    file_info.line = line;
+                    file_info.column = column;
+                    return cond;
+                }
+            }
+            else {
+                fseek(stream, offset, SEEK_SET);
+                file_info.line = line;
+                file_info.column = column;
+                return cond;
+            }
+        }
+        else {
+            unscan(token, stream);
+            return cond;
+        }
+    }
+    else {
+        unscan(token, stream);
+        return cond;
+    }
+}
+
+arithmetic *parse_arithmetic_constant(FILE *stream)
+{
+    aconstant_t *aconstant = parse_a_conditional(stream);
+    char *value = malloc(1024);
+    int atype;
+    if (aconstant->is_int) {
+        atype = int_t;
+        sprintf(value, "%d", aconstant->ival);
+    }
+    else {
+        atype = double_t;
+        sprintf(value, "%f", aconstant->fval);
+    }
+    return ARITHMETIC(value, atype);
+}
+
 
 int main(int argc, char **argv)
 {
