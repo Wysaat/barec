@@ -629,5 +629,7 @@ void syntax_translation_unit(FILE *stream);
 void syntax_a_conditional(FILE *stream);
 void error_message_np(int line, int column, char *message);
 void errorh_np(int line, int column);
+int type_list_eq(list *left, list *right);
+char *type_list_to_str(list *type_list);
 
 #endif /* SCAN_H */

@@ -686,7 +686,7 @@ void syntax_parameter_list(FILE *stream, namespace_t *namespace)
 void error_message(char *message)
 {
     file_info.error = 1;
-    printf("%s:%d:%d: error: %s\n", file_info.file_name, file_info.line, file_info.column, message);
+    fprintf(stderr, "%s:%d:%d: error: %s\n", file_info.file_name, file_info.line, file_info.column, message);
 }
 
 /* 
@@ -852,43 +852,41 @@ declarator *syntax_declarator(FILE *stream, namespace_t *namespace, int abstract
         }
         else {
             unscan(token, stream);
-            list *ptr = new_type_list;
+            list *ptr;
+            int is_func = 0, is_array = 0;
+            for (ptr = new_type_list->next; ptr; ptr = ptr->next) {
+                if (is_func) {
+                    if (type(ptr->content) == function_t)
+                        error_message_np(line1, column1, "function cannot return function type");
+                    else
+                        error_message_np(line1, column1, "function cannot return array type");
+                    type_list = list_node();
+                    break;
+                }
+                else if (is_array) {
+                    if (type(ptr->content) == function_t) {
+                        error_message_np(line1, column1, "declaration as array of functions");
+                        type_list = list_node();
+                        break;
+                    }
+                    else if (!((array *)ptr->content)->size) {
+                        error_message_np(line1, column1, "array type has incomplete element type");
+                        type_list = list_node();
+                        break;
+                    }
+                }
+                else if (type(ptr->content) == function_t)
+                    is_func = 1;
+                else
+                    is_array = 1;
+            }
+            ptr = new_type_list;
             while (ptr->next)
                 ptr = ptr->next;
             ptr->next = type_list;
             type_list->prev = ptr;
             type_list = new_type_list->next;
             type_list->prev = 0;
-            int is_func = 0, is_array = 0, first_array = 1;
-            for (ptr = type_list; ptr->next; ptr = ptr->next) {
-                if (is_func) {
-                    if (type(ptr->content) == function_t)
-                        error_message_np(line1, column1, "function cannot return function type");
-                    else
-                        error_message_np(line1, column1, "function cannot return array type");
-                    break;
-                }
-                else if (is_array) {
-                    if (type(ptr->content) == function_t) {
-                        error_message_np(line1, column1, "declaration as array of functions");
-                        break;
-                    }
-                    else if (!first_array && !((array *)ptr->content)->size) {
-                        error_message_np(line1, column1, "array type has incomplete element type");
-                        break;
-                    }
-                }
-                else if (type(ptr->content) == function_t)
-                    is_func = 1;
-                else {
-                    is_array = 1;
-                    if (!first_array && !((array *)ptr->content)->size) {
-                        error_message_np(line1, column1, "array type has incomplete element type");
-                        break;
-                    }
-                    first_array = 0;
-                }
-            }
             return declarator_init(id, type_list);
         }
     }
@@ -1056,7 +1054,7 @@ list *syntax_primary(FILE *stream, namespace_t *namespace)
         if (!dptr) {
             unscan(token, stream);
             errorh();
-            printf("use of undeclared identifier '%s'\n", token);
+            fprintf(stderr, "use of undeclared identifier '%s'\n", token);
             scan(stream);
             return 0;
         }
@@ -1152,7 +1150,7 @@ static list *epost_suref(char *token, list *llist, int line, int column)
         if (!is_member) {
             llist = 0;
             errorh_np(line, column);
-            printf("no member name '%s' in 'struct'\n", token);
+            fprintf(stderr, "no member name '%s' in 'struct'\n", token);
         }
     }
     else {
@@ -1170,7 +1168,7 @@ static list *epost_suref(char *token, list *llist, int line, int column)
         if (!is_member) {
             llist = 0;
             errorh_np(line, column);
-            printf("no member name '%s' in 'union'\n", token);
+            fprintf(stderr, "no member name '%s' in 'union'\n", token);
         }
     }
     return llist;
@@ -1374,6 +1372,8 @@ list *syntax_unary(FILE *stream, namespace_t *namespace)
                 free(ulist->prev);
                 ulist->prev = 0;
             }
+            else if (t == function_t)
+                ;
             else {
                 ulist = 0;
                 error_message_np(line, column, "indirection requires pointer operand");
@@ -1427,6 +1427,8 @@ list *syntax_unary(FILE *stream, namespace_t *namespace)
             if (t == arithmetic_specifier_t || t == pointer_t || t == array_t) {
                 ulist->type = not_lvalue;
                 ulist->content = arithmetic_specifier_init(int_t);
+                ulist->next->prev = 0;
+                ulist->next = 0;
             }
             else {
                 ulist = 0;
@@ -1503,16 +1505,17 @@ list *syntax_cast(FILE *stream, namespace_t *namespace)
                     int column2 = file_info.column;
                     list *rlist = syntax_cast(stream, namespace);
                     if (llist && rlist) {
+                        int lt = type(llist->content);
                         int rt = type(rlist->content);
-                        if (rt != arithmetic_specifier_t && rt != pointer_t && rt != array_t) {
+                        if (rt != arithmetic_specifier_t && rt != pointer_t && rt != array_t && rt != function_t) {
                             error_message_np(line2, column2, "arithmetic or pointer type is required");
                             return 0;
                         }
-                        else if (rt = pointer_t || rt == array_t && lt == arithmetic_specifier_t) {
+                        else if ((rt == pointer_t || rt == array_t || rt == function_t) && lt == arithmetic_specifier_t) {
                             arithmetic_specifier *s = llist->content;
                             if (s->atype == float_t || s->atype == double_t || s->atype == long_double_t) {
                                 errorh_np(line2, column2);
-                                printf("pointer cannot be cast to type '%s'\n", s->atype == float_t ? "float" :
+                                fprintf(stderr, "pointer cannot be cast to type '%s'\n", s->atype == float_t ? "float" :
                                             s->atype == double_t ? "double" : "long double");
                                 return 0;
                             }
@@ -1542,106 +1545,579 @@ list *syntax_cast(FILE *stream, namespace_t *namespace)
     }
 }
 
-void syntax_m_expr(FILE *stream, namespace_t *namespace) {
-    syntax_cast(stream, namespace);
-    while (1) {
-        char *token = scan(stream);
-        if (!strcmp(token, "*") || !strcmp(token, "/") || !strcmp(token, "%"))
-            syntax_cast(stream, namespace);
-        else {
-            unscan(token, stream);
-            return;
-        }
-    }
+static inline int int_promotionp(arithmetic_specifier *s)
+{
+    return s->atype == char_t || s->atype == unsigned_char_t ||
+               s->atype == short_t || s->atype == unsigned_short_t;
 }
-void syntax_a_expr(FILE *stream, namespace_t *namespace) {
-    syntax_m_expr(stream, namespace);
+
+static void *arith_conv(arithmetic_specifier *ls, arithmetic_specifier *rs)
+{
+    if (ls->atype == long_double_t || rs->atype == long_double_t)
+        return arithmetic_specifier_init(long_double_t);
+    else if (ls->atype == double_t || rs->atype == double_t)
+        return arithmetic_specifier_init(double_t);
+    else if (ls->atype == float_t || rs->atype == float_t)
+        return arithmetic_specifier_init(float_t);
+    else if (ls->atype == unsigned_long_long_t || rs->atype == unsigned_long_long_t)
+        return arithmetic_specifier_init(unsigned_long_long_t);
+    else if (ls->atype == long_long_t || rs->atype == long_long_t)
+        return arithmetic_specifier_init(long_long_t);
+    else if (ls->atype == unsigned_long_t || rs->atype == unsigned_long_t)
+        return arithmetic_specifier_init(unsigned_long_t);
+    else if (ls->atype == long_t || rs->atype == long_t)
+        return arithmetic_specifier_init(long_t);
+    else if (ls->atype == unsigned_int_t || rs->atype == unsigned_int_t)
+        return arithmetic_specifier_init(unsigned_int_t);
+    else
+        return arithmetic_specifier_init(int_t);
+}
+
+list *syntax_m_expr(FILE *stream, namespace_t *namespace)
+{
+    list *llist = syntax_cast(stream, namespace);
     while (1) {
+        int line = file_info.line;
+        int column = file_info.column;
         char *token = scan(stream);
-        if (!strcmp(token, "+") || !strcmp(token, "-"))
-            syntax_m_expr(stream, namespace);
+        if (!strcmp(token, "*") || !strcmp(token, "/") || !strcmp(token, "%")) {
+            list *rlist = syntax_cast(stream, namespace);
+            if (llist && rlist) {
+                int lt = type(llist->content);
+                int rt = type(rlist->content);
+                if (lt == arithmetic_specifier_t && rt == arithmetic_specifier_t) {
+                    arithmetic_specifier *ls = llist->content, *rs = rlist->content;
+                    if (!strcmp(token, "%")) {
+                        if (at_integral(ls->atype) && at_integral(rs->atype)) {
+                            llist->content = arith_conv(ls, rs);
+                            llist->type = not_lvalue;
+                        }
+                        else {
+                            llist = 0;
+                            error_message_np(line, column, "invalid operands to binary %");
+                        }
+                    }
+                    else {
+                        llist->content = arith_conv(ls, rs);
+                        llist->type = not_lvalue;
+                    }
+                }
+                else {
+                    llist = 0;
+                    errorh_np(line, column);
+                    fprintf(stderr, "invalid operands to binary %c\n", !strcmp(token, "*") ? '*' : '/');
+                }
+            }
+            else
+                llist = 0;
+        }
         else {
             unscan(token, stream);
-            return;
+            return llist;
         }
     }
 }
 
-void syntax_shift(FILE *stream, namespace_t *namespace) {
-    syntax_a_expr(stream, namespace);
-    while (1) {
-        char *token = scan(stream);
-        if (!strcmp(token, "<<") || !strcmp(token, ">>"))
-            syntax_a_expr(stream, namespace);
-        else {
-            unscan(token, stream);
-            return;
+int type_list_eq(list *left, list *right)
+{
+    list *ptr1 = left, *ptr2 = right;
+    if ((type(ptr1->content) == pointer_t || type(ptr1->content) == array_t) &&
+             (type(ptr2->content) == pointer_t || type(ptr2->content) == array_t)) {
+        ptr1 = ptr1->next;
+        ptr2 = ptr2->next;
+    }
+    else if (type(ptr1->content) == function_t &&
+                  ((type(ptr2->content) == pointer_t || type(ptr2->content) == array_t) &&
+                          type(ptr2->next->content) == function_t))
+        ptr2 = ptr2->next;
+    else if (type(ptr2->content) == function_t &&
+                  ((type(ptr1->content) == pointer_t || type(ptr1->content) == array_t) &&
+                          type(ptr1->next->content) == function_t))
+        ptr1 = ptr1->next;
+
+    for ( ; ptr1 && ptr2; ptr1 = ptr1->next, ptr2 = ptr2->next) {
+        if (type(ptr1->content) != type(ptr2->content))
+            return 0;
+        else if (type(ptr1->content) == struct_specifier_t) {
+            struct_specifier *s1 = ptr1->content, *s2 = ptr2->content;
+            if (!strcmp(s1->id, s2->id))
+                return 1;
+            else
+                return 0;
+        }
+        else if (type(ptr1->content) == union_specifier_t) {
+            union_specifier *s1 = ptr1->content, *s2 = ptr2->content;
+            if (!strcmp(s1->id, s2->id))
+                return 1;
+            else
+                return 0;
+        }
+        else if (type(ptr2->content) == enum_type) {
+            enum_t *s1 = ptr1->content, *s2 = ptr2->content;
+            if (!strcmp(s1->id, s2->id))
+                return 1;
+            else
+                return 0;
+        }
+        else if (type(ptr2->content) == arithmetic_specifier_t) {
+            arithmetic_specifier *s1 = ptr1->content, *s2 = ptr2->content;
+            if (s1->atype == s2->atype)
+                return 1;
+            else
+                return 0;
         }
     }
 }
 
-void syntax_relational(FILE *stream, namespace_t *namespace) {
-    syntax_shift(stream, namespace);
+static char *arithmetic_specifier_to_str(arithmetic_specifier *specifier)
+{
+    switch (specifier->atype) {
+        case char_t: return "char";
+        case unsigned_char_t: return "unsigned char";
+        case short_t: return "short";
+        case unsigned_short_t: return "unsigned short";
+        case int_t: return "int";
+        case unsigned_int_t: return "unsigned int";
+        case long_t: return "long";
+        case unsigned_long_t: return "unsigned long";
+        case long_long_t: return "long long";
+        case unsigned_long_long_t: return "unsigned long long";
+        case float_t: return "float";
+        case double_t: return "double";
+        case long_double_t: return "long double";
+    }
+}
+
+char *type_list_to_str(list *type_list)
+{
+    list *ptr = type_list;
+    int t, last_type;
+    buffer *buff = buff_init();
+    if (type(ptr->content) == array_t || type(ptr->content) == pointer_t) {
+        buff_add(buff, "*");
+        ptr = ptr->next;
+        last_type = pointer_t;
+    }
+    else if (type(ptr->content) == function_t) {
+        list *parameter_list = ((function *)ptr->content)->parameter_list;
+        buff_add(buff, "(*)(");
+        list *ptr2 = parameter_list->next;
+        if (ptr2) {
+            for ( ; ptr2->next; ptr2 = ptr2->next) {
+                buff_add(buff, type_list_to_str(((declaration *)ptr2->content)->type_list));
+                buff_add(buff, ", ");
+            }
+            buff_add(buff, type_list_to_str(((declaration *)ptr2->content)->type_list));
+        }
+        buff_add(buff, ")");
+        ptr = ptr->next;
+    }
+
+    for ( ; ptr; ptr = ptr->next) {
+        t = type(ptr->content);
+        if (t == pointer_t) {
+            buffer *new_buff = buff_init();
+            buff_add(new_buff, "*");
+            buff_add(new_buff, buff_puts(buff));
+            buff = new_buff;
+        }
+        else if (type(ptr->content) == array_t) {
+            if (last_type == pointer_t) {
+                buffer *new_buff = buff_init();
+                buff_add(new_buff, "(");
+                buff_add(new_buff, buff_puts(buff));
+                buff_add(new_buff, ")[]");
+                buff = new_buff;
+            }
+            else
+                buff_add(buff, "[]");
+        }
+        else if (type(ptr->content) == function_t) {
+            if (last_type = pointer_t) {
+                buffer *new_buff = buff_init();
+                buff_add(new_buff, "(");
+                buff_add(new_buff, buff_puts(buff));
+                buff_add(new_buff, ")(");
+                list *ptr2 = ((function *)ptr->content)->parameter_list->next;
+                if (ptr2) {
+                    for ( ; ptr2->next; ptr2 = ptr2->next) {
+                        buff_add(buff, type_list_to_str(((declaration *)ptr2->content)->type_list));
+                        buff_add(buff, ", ");
+                    }
+                    buff_add(new_buff, type_list_to_str(((declaration *)ptr2->content)->type_list));
+                }
+                buff_add(new_buff, ")");
+                buff = new_buff;
+            }
+            else
+                buff_add(buff, "()");
+        }
+        else if (type(ptr->content) == arithmetic_specifier_t) {
+            buffer *new_buff = buff_init();
+            buff_add(new_buff, arithmetic_specifier_to_str(ptr->content));
+            if (ptr != type_list)
+                buff_add(new_buff, " ");
+            buff_add(new_buff, buff_puts(buff));
+            buff = new_buff;
+        }
+        else if (type(ptr->content) == struct_specifier_t) {
+            buffer *new_buff = buff_init();
+            buff_add(new_buff, "struct ");
+            buff_add(new_buff, ((struct_specifier *)ptr->content)->id);
+            if (ptr != type_list)
+                buff_add(new_buff, " ");
+            buff_add(new_buff, buff_puts(buff));
+            buff = new_buff;
+        }
+        else if (type(ptr->content) == union_specifier_t) {
+            buffer *new_buff = buff_init();
+            buff_add(new_buff, "union ");
+            buff_add(new_buff, ((union_specifier *)ptr->content)->id);
+            if (ptr != type_list)
+                buff_add(new_buff, " ");
+            buff_add(new_buff, buff_puts(buff));
+            buff = new_buff;
+        }
+        else if (type(ptr->content) == enum_type) {
+            buffer *new_buff = buff_init();
+            buff_add(new_buff, "enum ");
+            buff_add(new_buff, ((enum_t *)ptr->content)->id);
+            if (ptr != type_list)
+                buff_add(new_buff, " ");
+            buff_add(new_buff, buff_puts(buff));
+            buff = new_buff;
+        }
+        last_type = t;
+    }
+    return buff_puts(buff);
+}
+
+list *syntax_a_expr(FILE *stream, namespace_t *namespace)
+{
+    list *llist = syntax_m_expr(stream, namespace);
     while (1) {
+        int line = file_info.line;
+        int column = file_info.column;
+        char *token = scan(stream);
+        if (!strcmp(token, "+") || !strcmp(token, "-")) {
+            list *rlist = syntax_m_expr(stream, namespace);
+            if (llist && rlist) {
+                int lt = type(llist->content);
+                int rt = type(rlist->content);
+                if (lt == arithmetic_specifier_t && rt == arithmetic_specifier_t) {
+                    arithmetic_specifier *ls = llist->content, *rs = rlist->content;
+                    llist->content = arith_conv(ls, rs);
+                    llist->type = not_lvalue;
+                }
+                else if (lt == arithmetic_specifier_t && (rt == pointer_t || rt == array_t || rt == function_t)) {
+                    arithmetic_specifier *ls = llist->content;
+                    if (at_integral(ls->atype)) {
+                        llist = rlist;
+                        llist->type = not_lvalue;
+                    }
+                    else {
+                        llist = 0;
+                        error_message_np(line, column, "invalid operands to binary +/-");
+                    }
+                }
+                else if ((lt == pointer_t || lt == array_t || lt == function_t) && rt == arithmetic_specifier_t) {
+                    arithmetic_specifier *rs = rlist->content;
+                    if (at_integral(rs->atype))
+                        llist->type = not_lvalue;
+                    else {
+                        llist = 0;
+                        error_message_np(line, column, "invalid operands to binary +/-");
+                    }
+                }
+                else if (!strcmp(token, "-") && (lt == pointer_t || lt == array_t || lt == function_t)
+                                                       && (rt == pointer_t || rt == array_t || rt == function_t)) {
+                    if (type_list_eq(llist, rlist))
+                        llist->type = not_lvalue;
+                    else {
+                        errorh_np(line, column);
+                        fprintf(stderr, "invalid operands to binary - (have '%s' and '%s')\n",
+                                     type_list_to_str(llist), type_list_to_str(rlist));
+                        llist = 0;
+                    }
+                }
+                else {
+                    llist = 0;
+                    error_message_np(line, column, "invalid operands to binary +/-");
+                }
+            }
+            else
+                llist = 0;
+        }
+        else {
+            unscan(token, stream);
+            return llist;
+        }
+    }
+}
+
+list *syntax_shift(FILE *stream, namespace_t *namespace) {
+    list *llist = syntax_a_expr(stream, namespace);
+    while (1) {
+        int line = file_info.line;
+        int column = file_info.column;
+        char *token = scan(stream);
+        if (!strcmp(token, "<<") || !strcmp(token, ">>")) {
+            list *rlist = syntax_a_expr(stream, namespace);
+            if (llist && rlist) {
+                int lt = type(llist->content);
+                int rt = type(rlist->content);
+                if (lt == arithmetic_specifier_t && rt == arithmetic_specifier_t) {
+                    arithmetic_specifier *ls = llist->content, *rs = rlist->content;
+                    if (at_integral(ls->atype) && at_integral(rs->atype)) {
+                        llist->content = arith_conv(ls, rs);
+                        llist->type = not_lvalue;
+                    }
+                    else {
+                        errorh_np(line, column);
+                        fprintf(stderr, "invalid operands to binary %s (hava '%s' and '%s'\n",
+                                     !strcmp(token, "<<") ? "<<" : ">>", type_list_to_str(llist), type_list_to_str(rlist));
+                        llist = 0;
+                    }
+                }
+                else {
+                    errorh_np(line, column);
+                    fprintf(stderr, "invalid operands to binary %s (hava '%s' and '%s'\n",
+                                 !strcmp(token, "<<") ? "<<" : ">>", type_list_to_str(llist), type_list_to_str(rlist));
+                    llist = 0;
+                }
+            }
+            else
+                llist = 0;
+        }
+        else {
+            unscan(token, stream);
+            return llist;
+        }
+    }
+}
+
+list *syntax_relational(FILE *stream, namespace_t *namespace) {
+    list *llist = syntax_shift(stream, namespace);
+    while (1) {
+        int line = file_info.line;
+        int column = file_info.column;
         char *token = scan(stream);
         if (!strcmp(token, "<") || !strcmp(token, ">") ||
-                  !strcmp(token, "<=") || !strcmp(token, ">="))
-            syntax_shift(stream, namespace);
+                  !strcmp(token, "<=") || !strcmp(token, ">=")) {
+            list *rlist = syntax_shift(stream, namespace);
+            if (llist && rlist) {
+                int lt = type(llist->content);
+                int rt = type(rlist->content);
+                if (lt == arithmetic_specifier_t && rt == arithmetic_specifier_t) {
+                    llist->type = not_lvalue;
+                    llist->content = arithmetic_specifier_init(int_t);
+                }
+                else if (lt == arithmetic_specifier_t && (rt == pointer_t || rt == array_t || rt == function_t)) {
+                    if (at_integral(((arithmetic_specifier *)llist->content)->atype)) {
+                        llist->type = not_lvalue;
+                        llist->content = arithmetic_specifier_init(int_t);
+                    }
+                    else {
+                        errorh_np(line, column);
+                        fprintf(stderr, "invalid operands to binary %s (have '%s' and '%s')\n",
+                                      !strcmp(token, "<") ? "<" : !strcmp(token, ">") ? ">" :
+                                      !strcmp(token, "<=") ? "<=" : ">=", type_list_to_str(llist), type_list_to_str(rlist));
+                        llist = 0;
+                    }
+                }
+                else if (rt == arithmetic_specifier_t && (lt == pointer_t || lt == array_t || lt == function_t)) {
+                    if (at_integral(((arithmetic_specifier *)rlist->content)->atype)) {
+                        llist->type = not_lvalue;
+                        llist->content = arithmetic_specifier_init(int_t);
+                        llist->next = 0;
+                    }
+                    else {
+                        errorh_np(line, column);
+                        fprintf(stderr, "invalid operands to binary %s (have '%s' and '%s')\n",
+                                      !strcmp(token, "<") ? "<" : !strcmp(token, ">") ? ">" :
+                                      !strcmp(token, "<=") ? "<=" : ">=", type_list_to_str(llist), type_list_to_str(rlist));
+                        llist = 0;
+                    }
+                }
+                else if ((lt == pointer_t || lt == array_t || lt == function_t) &&
+                               (rt == pointer_t || rt == array_t || rt == function_t)) {
+                    llist->type = not_lvalue;
+                    llist->content = arithmetic_specifier_init(int_t);
+                    llist->next = 0;
+                }
+                else {
+                    errorh_np(line, column);
+                    fprintf(stderr, "invalid operands to binary %s (have '%s' and '%s')\n",
+                                  !strcmp(token, "<") ? "<" : !strcmp(token, ">") ? ">" :
+                                  !strcmp(token, "<=") ? "<=" : ">=", type_list_to_str(llist), type_list_to_str(rlist));
+                    llist = 0;
+                }
+            }
+            else
+                llist = 0;
+        }
         else {
             unscan(token, stream);
-            return;
+            return llist;
         }
     }
 }
 
-void syntax_equality(FILE *stream, namespace_t *namespace) {
-    syntax_relational(stream, namespace);
+list *syntax_equality(FILE *stream, namespace_t *namespace) {
+    list *llist = syntax_relational(stream, namespace);
     while (1) {
+        int line = file_info.line;
+        int column = file_info.column;
         char *token = scan(stream);
-        if (!strcmp(token, "==") || !strcmp(token, "!="))
-            syntax_relational(stream, namespace);
+        if (!strcmp(token, "==") || !strcmp(token, "!=")) {
+            list *rlist = syntax_relational(stream, namespace);
+            if (llist && rlist) {
+                int lt = type(llist->content);
+                int rt = type(rlist->content);
+                if (lt == arithmetic_specifier_t && rt == arithmetic_specifier_t) {
+                    llist->type = not_lvalue;
+                    llist->content = arithmetic_specifier_init(int_t);
+                }
+                else if (lt == arithmetic_specifier_t && (rt == pointer_t || rt == array_t || rt == function_t)) {
+                    if (at_integral(((arithmetic_specifier *)llist->content)->atype)) {
+                        llist->type = not_lvalue;
+                        llist->content = arithmetic_specifier_init(int_t);
+                    }
+                    else {
+                        errorh_np(line, column);
+                        fprintf(stderr, "invalid operands to binary %s (have '%s' and '%s')\n",
+                                      !strcmp(token, "==") ? "==" : "!=", type_list_to_str(llist), type_list_to_str(rlist));
+                        llist = 0;
+                    }
+                }
+                else if (rt == arithmetic_specifier_t && (lt == pointer_t || lt == array_t || lt == function_t)) {
+                    if (at_integral(((arithmetic_specifier *)rlist->content)->atype)) {
+                        llist->type = not_lvalue;
+                        llist->content = arithmetic_specifier_init(int_t);
+                        llist->next = 0;
+                    }
+                    else {
+                        errorh_np(line, column);
+                        fprintf(stderr, "invalid operands to binary %s (have '%s' and '%s')\n",
+                                      !strcmp(token, "==") ? "==" : "!=", type_list_to_str(llist), type_list_to_str(rlist));
+                        llist = 0;
+                    }
+                }
+                else if ((lt == pointer_t || lt == array_t || lt == function_t) &&
+                               (rt == pointer_t || rt == array_t || rt == function_t)) {
+                    llist->type = not_lvalue;
+                    llist->content = arithmetic_specifier_init(int_t);
+                    llist->next = 0;
+                }
+                else {
+                    errorh_np(line, column);
+                    fprintf(stderr, "invalid operands to binary %s (have '%s' and '%s')\n",
+                                  !strcmp(token, "==") ? "==" : "!=", type_list_to_str(llist), type_list_to_str(rlist));
+                    llist = 0;
+                }
+            }
+            else
+                llist = 0;
+        }
         else {
             unscan(token, stream);
-            return;
+            return llist;
         }
     }
 }
 
-void syntax_and(FILE *stream, namespace_t *namespace) {
-    syntax_equality(stream, namespace);
+list *syntax_and(FILE *stream, namespace_t *namespace) {
+    list *llist = syntax_equality(stream, namespace);
     while (1) {
+        int line = file_info.line;
+        int column = file_info.column;
         char *token = scan(stream);
-        if (!strcmp(token, "&"))
-            syntax_equality(stream, namespace);
+        if (!strcmp(token, "&")) {
+            list *rlist = syntax_equality(stream, namespace);
+            if (llist && rlist) {
+                if ((type(llist->content) == arithmetic_specifier_t && type(rlist->content) == arithmetic_specifier_t) &&
+                          at_integral(((arithmetic_specifier *)llist->content)->atype) &&
+                                at_integral(((arithmetic_specifier *)rlist->content)->atype)) {
+                    llist->content = arith_conv(llist->content, rlist->content);
+                    llist->type = not_lvalue;
+                }
+                else {
+                    errorh_np(line, column);
+                    fprintf(stderr, "invalid operands to binary & (have '%s' and '%s')\n",
+                        type_list_to_str(llist), type_list_to_str(rlist));
+                    llist = 0;
+                }
+            }
+            else
+                llist = 0;
+        }
         else {
             unscan(token, stream);
-            return;
+            return llist;
         }
     }
 }
 
-void syntax_xor(FILE *stream, namespace_t *namespace) {
-    syntax_and(stream, namespace);
+list *syntax_xor(FILE *stream, namespace_t *namespace) {
+    list *llist = syntax_and(stream, namespace);
     while (1) {
+        int line = file_info.line;
+        int column = file_info.column;
         char *token = scan(stream);
-        if (!strcmp(token, "^"))
-            syntax_and(stream, namespace);
+        if (!strcmp(token, "^")) {
+            list *rlist = syntax_and(stream, namespace);
+            if (llist && rlist) {
+                if ((type(llist->content) == arithmetic_specifier_t && type(rlist->content) == arithmetic_specifier_t) &&
+                          at_integral(((arithmetic_specifier *)llist->content)->atype) &&
+                                at_integral(((arithmetic_specifier *)rlist->content)->atype)) {
+                    llist->content = arith_conv(llist->content, rlist->content);
+                    llist->type = not_lvalue;
+                }
+                else {
+                    errorh_np(line, column);
+                    fprintf(stderr, "invalid operands to binary & (have '%s' and '%s')\n",
+                        type_list_to_str(llist), type_list_to_str(rlist));
+                    llist = 0;
+                }
+            }
+            else
+                llist = 0;
+        }
         else {
             unscan(token, stream);
-            return;
+            return llist;
         }
     }
 }
 
-void syntax_or(FILE *stream, namespace_t *namespace) {
-    syntax_xor(stream, namespace);
+list *syntax_or(FILE *stream, namespace_t *namespace) {
+    list *llist = syntax_xor(stream, namespace);
     while (1) {
+        int line = file_info.line;
+        int column = file_info.column;
         char *token = scan(stream);
-        if (!strcmp(token, "|"))
-            syntax_xor(stream, namespace);
+        if (!strcmp(token, "|")) {
+            list *rlist = syntax_xor(stream, namespace);
+            if (llist && rlist) {
+                if ((type(llist->content) == arithmetic_specifier_t && type(rlist->content) == arithmetic_specifier_t) &&
+                          at_integral(((arithmetic_specifier *)llist->content)->atype) &&
+                                at_integral(((arithmetic_specifier *)rlist->content)->atype)) {
+                    llist->content = arith_conv(llist->content, rlist->content);
+                    llist->type = not_lvalue;
+                }
+                else {
+                    errorh_np(line, column);
+                    fprintf(stderr, "invalid operands to binary & (have '%s' and '%s')\n",
+                        type_list_to_str(llist), type_list_to_str(rlist));
+                    llist = 0;
+                }
+            }
+            else
+                llist = 0;
+        }
         else {
             unscan(token, stream);
-            return;
+            return llist;
         }
     }
 }
@@ -1709,17 +2185,16 @@ void syntax_assignment(FILE *stream, namespace_t *namespace) {
 }
 
 list *syntax_expression(FILE *stream, namespace_t *namespace) {
-    // while (1) {
-    //     syntax_assignment(stream, namespace);
-    //     char *token = scan(stream);
-    //     if (!strcmp(token, ","))
-    //         continue;
-    //     else {
-    //         unscan(token, stream);
-    //         return;
-    //     }
-    // }
-    return syntax_cast(stream, namespace);
+    while (1) {
+        syntax_assignment(stream, namespace);
+        char *token = scan(stream);
+        if (!strcmp(token, ","))
+            continue;
+        else {
+            unscan(token, stream);
+            return;
+        }
+    }
 }
 
 void syntax_expression_stmt(FILE *stream, namespace_t *namespace) {

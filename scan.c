@@ -33,7 +33,7 @@ void f_ungetc(char ch, FILE *stream)
 
 void errorh()
 {
-    printf("%s:%d:%d: error: ", file_info.file_name, file_info.line, file_info.column);
+    fprintf(stderr, "%s:%d:%d: error: ", file_info.file_name, file_info.line, file_info.column);
     file_info.error = 1;
 }
 
@@ -1405,7 +1405,7 @@ int type_is_int(void *expr)
 }
 
 /* arithmetic convertion contains integral promotion */
-void **arithmetic_convertion(void *left, void *right)
+void **arithmetic_conversion(void *left, void *right)
 {
     void **retptr = (void **)malloc(sizeof(void *)*2);
     enum atypes l = get_type(left), r = get_type(right), res;
@@ -1446,14 +1446,14 @@ void *parse_m_expr(FILE *stream, namespace_t *namespace) {
             btype_t btype = !strcmp(token, "*") ? mul : divi;
             void *expr2 = parse_cast(stream, namespace);
             if (get_type(expr) == arithmetic_specifier_t && get_type(expr2) == arithmetic_specifier_t) {
-                void **ptr = arithmetic_convertion(expr, expr2);
+                void **ptr = arithmetic_conversion(expr, expr2);
                 expr = BINARY(btype, *ptr, *(ptr+1));
             }
         }
         else if (!strcmp(token, "%")) {
             void *expr2 = parse_cast(stream, namespace);
             if (type_is_int(expr) && type_is_int(expr2)) {
-                void **ptr = arithmetic_convertion(expr, expr2);
+                void **ptr = arithmetic_conversion(expr, expr2);
                 expr = BINARY(mod, *ptr, *(ptr+1));
             }
         }
@@ -1472,7 +1472,7 @@ void *parse_a_expr(FILE *stream, namespace_t *namespace) {
             btype_t btype = !strcmp(token, "+") ? add : sub;
             void *expr2 = parse_m_expr(stream, namespace);
             if (get_type(expr) == arithmetic_specifier_t && get_type(expr2) == arithmetic_specifier_t) {
-                void **ptr = arithmetic_convertion(expr, expr2);
+                void **ptr = arithmetic_conversion(expr, expr2);
                 expr = BINARY(btype, *ptr, *(ptr+1));
             }
             else if ((get_type(expr) == pointer_t || get_type(expr) == array_t) && type_is_int(expr2))
@@ -1518,7 +1518,7 @@ void *parse_relational(FILE *stream, namespace_t *namespace) {
                             !strcmp(token, "<=") ? le : ge;
             void *expr2 = parse_shift(stream, namespace);
             if (get_type(expr) == arithmetic_specifier_t && get_type(expr2) == arithmetic_specifier_t) {
-                void **ptr = arithmetic_convertion(expr, expr2);
+                void **ptr = arithmetic_conversion(expr, expr2);
                 expr = BINARY(btype, *ptr, *(ptr+1));
             }
             else if ((get_type(expr) == pointer_t ||get_type(expr) == array_t) &&
@@ -1540,7 +1540,7 @@ void *parse_equality(FILE *stream, namespace_t *namespace) {
             btype_t btype = !strcmp(token, "==") ? eq : neq;
             void *expr2 = parse_relational(stream, namespace);
             if (get_type(expr) == arithmetic_specifier_t && get_type(expr2) == arithmetic_specifier_t) {
-                void **ptr = arithmetic_convertion(expr, expr2);
+                void **ptr = arithmetic_conversion(expr, expr2);
                 expr = BINARY(btype, *ptr, *(ptr+1));
             }
             else if ((get_type(expr) == pointer_t ||get_type(expr) == array_t) &&
@@ -1561,7 +1561,7 @@ void *parse_and(FILE *stream, namespace_t *namespace) {
         if (!strcmp(token, "&")) {
             void *expr2 = parse_equality(stream, namespace);
             if (type_is_int(expr) && type_is_int(expr2)) {
-                void **ptr = arithmetic_convertion(expr, expr2);
+                void **ptr = arithmetic_conversion(expr, expr2);
                 expr = BINARY(band, *ptr, *(ptr+1));
             }
         }
@@ -1579,7 +1579,7 @@ void *parse_xor(FILE *stream, namespace_t *namespace) {
         if (!strcmp(token, "^")) {
             void *expr2 = parse_and(stream, namespace);
             if (type_is_int(expr) && type_is_int(expr2)) {
-                void **ptr = arithmetic_convertion(expr, expr2);
+                void **ptr = arithmetic_conversion(expr, expr2);
                 expr = BINARY(bxor, *ptr, *(ptr+1));
             }
         }
@@ -1597,7 +1597,7 @@ void *parse_or(FILE *stream, namespace_t *namespace) {
         if (!strcmp(token, "|")) {
             void *expr2 = parse_xor(stream, namespace);
             if (type_is_int(expr) && type_is_int(expr2)) {
-                void **ptr = arithmetic_convertion(expr, expr2);
+                void **ptr = arithmetic_conversion(expr, expr2);
                 expr = BINARY(bor, *ptr, *(ptr+1));
             }
         }
@@ -1644,7 +1644,7 @@ void *conditional_init(void *expr1, void *expr2, void *expr3)
     list *type_list2 = get_type_list(expr3);
     void *s1 = type_list1->content, *s2 = type_list2->content;
     if (type(s1) == type(s2) == arithmetic_t) {
-        void **exprs = arithmetic_convertion(expr2, expr3);
+        void **exprs = arithmetic_conversion(expr2, expr3);
         retptr->expr2 = exprs[0];
         retptr->expr3 = exprs[1];
         retptr->type_list = get_type_list(expr2);
