@@ -6,25 +6,27 @@ int type(void *stmt) {
     return *(int *)stmt;
 }
 
-auto_storage *auto_storage_init(int constant, int iaddress, void *vaddress)
+auto_storage *auto_storage_init(int constant, int ival, void *vval)
 {
     auto_storage *retptr = malloc(sizeof(auto_storage));
     retptr->type = auto_storage_t;
     retptr->constant = constant;
-    retptr->iaddress = iaddress;
-    retptr->vaddress = vaddress;
+    retptr->ival = ival;
+    retptr->vval = vval;
     return retptr;
 }
 
-static_storage *static_storage_init() {
+static_storage *static_storage_init(int ival, int initialized) {
     static_storage *retptr = malloc(sizeof(static_storage));
     retptr->type = static_storage_t;
+    retptr->ival = ival;
+    retptr->initialized = initialized;
     return retptr;
 }
 
-extern_storage *extern_storage_init() {
-    extern_storage *retptr = malloc(sizeof(extern_storage));
-    retptr->type = extern_storage_t;
+void_specifier *void_specifier_init() {
+    void_specifier *retptr = malloc(sizeof(void_specifier));
+    retptr->type = void_specifier_t;
     return retptr;
 }
 
@@ -32,6 +34,7 @@ arithmetic_specifier *arithmetic_specifier_init(int atype) {
     arithmetic_specifier *retptr = (arithmetic_specifier *)malloc(sizeof(arithmetic_specifier));
     retptr->type = arithmetic_specifier_t;
     retptr->atype = atype;
+    retptr->bits = -1;
     return retptr;
 }
 
@@ -117,7 +120,7 @@ string *STRING(int address, char *value) {
 
 void *ARRAY_REF(void *primary, void *expr) {
     list *llist = get_type_list(primary), *rlist = get_type_list(expr);
-    int lt = type(llist->content), rt = type(rlist->content);
+    int lt = type(llist->content);
     void *expr2;
     if (lt == pointer_t || lt == array_t) {
         void *size = size_expr(llist->next);
@@ -130,58 +133,56 @@ void *ARRAY_REF(void *primary, void *expr) {
     return INDIRECTION(expr2);
 }
 
-static void storage_add_size(auto_storage *left, struct size *right)
+void storage_add_size(auto_storage *left, struct size *right)
 {
     if (left->constant) {
         if (right->constant)
-            left->iaddress += right->ival;
+            left->ival += right->ival;
         else {
-            left->vaddress = BINARY(add, ARITHMETIC(itoa(left->iaddress), int_t), right->vval);
+            left->vval = BINARY(add, ARITHMETIC(itoa(left->ival), int_t), right->vval);
             left->constant = 0;
         }
     }
     else {
         if (right->constant)
-            left->vaddress = BINARY(add, left->vaddress, ARITHMETIC(itoa(right->ival), int_t));
+            left->vval = BINARY(add, left->vval, ARITHMETIC(itoa(right->ival), int_t));
         else
-            left->vaddress = BINARY(add, left->vaddress, right->vval);
+            left->vval = BINARY(add, left->vval, right->vval);
     }
 }
 
 auto_storage *auto_storage_add_size_nip(auto_storage *left, struct size *right)
 {
     int constant;
-    int iaddress = 0;
-    void *vaddress = 0;
+    int ival = 0;
+    void *vval = 0;
     if (left->constant) {
         if (right->constant) {
             constant = 1;
-            iaddress = left->iaddress + right->ival;
+            ival = left->ival + right->ival;
         }
         else {
             constant = 0;
-            vaddress = BINARY(add, ARITHMETIC(itoa(left->iaddress), int_t), right->vval);
+            vval = BINARY(add, ARITHMETIC(itoa(left->ival), int_t), right->vval);
         }
     }
     else {
         constant = 0;
         if (right->constant)
-            vaddress = BINARY(add, left->vaddress, ARITHMETIC(itoa(right->ival), int_t));
+            vval = BINARY(add, left->vval, ARITHMETIC(itoa(right->ival), int_t));
         else
-            vaddress = BINARY(add, left->vaddress, right->vval);
+            vval = BINARY(add, left->vval, right->vval);
     }
-    return auto_storage_init(constant, iaddress, vaddress);
+    return auto_storage_init(constant, ival, vval);
 }
 
 declaration *STRUCT_REF(void *primary, char *id) {
     struct_specifier *specifier = get_type_list(primary)->content;
-    if (specifier->declaration_list) {
-        list *ptr;
-        for (ptr = specifier->declaration_list->next; ptr; ptr = ptr->next) {
-            declaration *node = ptr->content;
-            if (!strcmp(node->id, id))
-                return node;
-        }
+    list *ptr;
+    for (ptr = specifier->declaration_list->next; ptr; ptr = ptr->next) {
+        declaration *node = ptr->content;
+        if (!strcmp(node->id, id))
+            return node;
     }
 }
 
@@ -626,6 +627,8 @@ list *get_type_list(void *vptr)
             return ((union_ref_t *)vptr)->type_list;
         case conditional_type:
             return ((conditional_t *)vptr)->type_list;
+        case typedef_type:
+            return ((typedef_t *)vptr)->type_list;
     }
 }
 
@@ -676,5 +679,9 @@ void set_type_list(list *type_list, void *vptr)
             break;
         case conditional_type:
             ((conditional_t *)vptr)->type_list = type_list;
+            break;
+        case typedef_type:
+            ((typedef_t *)vptr)->type_list = type_list;
+            break;
     }
 }

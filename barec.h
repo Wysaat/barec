@@ -8,9 +8,13 @@ typedef struct buffer buffer;
 
 buffer *data_buff, *bss_buff, *text_buff;
 
-int data_size;
+int data_size, bss_size;
 struct namespace *namespace;
 int tab;
+
+list *func_list;
+
+char *data_start_tag, *bss_start_tag;
 
 char *continue_tag, *break_tag, *return_tag;
 
@@ -26,11 +30,11 @@ struct {
 enum types {
     auto_storage_t,
     static_storage_t,
-    extern_storage_t,
     parameter_storage_t,
     arithmetic_specifier_t,
     struct_specifier_t,
     union_specifier_t,
+    void_specifier_t,
     pointer_t,
     array_t,
     function_t,
@@ -74,6 +78,9 @@ enum types {
     union_ref_type,
     conditional_type,
     not_lvalue,
+    constant_t,
+    init_info_type,
+    declarator_info_type,
 };
 
 enum atypes {
@@ -92,6 +99,10 @@ enum atypes {
     long_double_t = 12,   // 12 bytes
 };
 
+typedef struct void_specifier {
+    int type;
+} void_specifier;
+
 typedef struct namespace {
     list *struct_s_list;
     list *union_s_list;
@@ -101,6 +112,7 @@ typedef struct namespace {
     list *labels;  // nonzero iff the namespace is that of a function definition
     list *typedefs;
     list *enums;
+    int is_func_ns;
 } namespace_t;
 
 typedef struct aconstant {
@@ -167,7 +179,6 @@ typedef enum btype {
 
 typedef struct static_initialization {
     int type;
-    char *tag;
     struct compound_stmt *body;
     int initialized;
 } static_initialization;
@@ -185,19 +196,15 @@ typedef struct typedef_storage {
 typedef struct auto_storage {
     int type;
     int constant;
-    int iaddress;
-    void *vaddress;
+    int ival;
+    void *vval;
 } auto_storage;
 
 typedef struct static_storage {
     int type;
-    char *tag;
+    int ival;
+    int initialized;
 } static_storage;
-
-typedef struct extern_storage {
-    int type;
-    char *tag;
-} extern_storage;
 
 // storage for function parameters
 typedef struct parameter_storage {
@@ -208,6 +215,7 @@ typedef struct parameter_storage {
 typedef struct arithmetic_specifier {
     int type;
     enum atypes atype;
+    int bits;
 } arithmetic_specifier;
 
 typedef struct struct_specifier {
@@ -490,19 +498,21 @@ void *find_identifier(namespace_t *namespace, char *id);
 typedef_t *find_typedef(namespace_t *namespace, char *id);
 enum_t *find_enum(namespace_t *namespace, char *id);
 enumerator_t *find_enumerator(namespace_t *namespace, char *id);
+declaration *find_declaration_cn(namespace_t *namespace, char *id);
+typedef_t *find_typedef_cn(namespace_t *namespace, char *id);
 enum_t *enum_init(char *id, list *enumerators);
 list *parse_parameter_list(FILE *stream, struct namespace *namespace);
 typedef_t *typedef_init(char *id, list *type_list);
 void errorh();
-
+func *func_init(char *id, char *tag, list *type_list);
 /*
  * parse.c
  */
 
 int type(void *);
-auto_storage *auto_storage_init(int constant, int iaddress, void *vaddress);
-static_storage *static_storage_init();
-extern_storage *extern_storage_init();
+auto_storage *auto_storage_init(int constant, int ival, void *vval);
+static_storage *static_storage_init(int ival, int initialized);
+void_specifier *void_specifier_init();
 arithmetic_specifier *arithmetic_specifier_init(int atype);
 struct_specifier *struct_specifier_init(char *id, list *declaration_list);
 union_specifier *union_specifier_init(char *id, list *declaration_list);
@@ -545,6 +555,7 @@ list *get_type_list(void *vptr);
 void set_type_list(list *type_list, void *vptr);
 struct size *size_init(int constant, int ival, void *vval);
 struct size *size(list *type_list);
+void storage_add_size(auto_storage *left, struct size *right);
 auto_storage *auto_storage_add_size_nip(auto_storage *left, struct size *right);
 
 /*
@@ -557,6 +568,7 @@ auto_storage *auto_storage_add_size_nip(auto_storage *left, struct size *right);
 void unscan(char *token, FILE *stream);
 int is_id(char *token);
 int is_int(char *token);
+inline int is_float(char *token);
 char *itoa(int value);
 
 char *get_tag();
@@ -588,6 +600,8 @@ char *buff_puts(buffer *buff);
 int is_specifier(char *token);
 inline int is_storage(char *token);
 inline int is_qualifier(char *token);
+int list_len(list *);
+list *list_copy(list *head);
 
 /*
  * gencode.c
@@ -600,18 +614,26 @@ void function_definition_gencode(function_definition_t *function_definition);
  * check.c
  */
 
-declarator *syntax_declarator(FILE *stream, namespace_t *namespace, int abstract);
-void syntax_declaration(FILE *stream, namespace_t *namespace);
+typedef struct {
+    int type;
+    char *id;
+    list *type_list;
+    int line;
+    int column;
+} declarator_info_t;
+
+declarator_info_t *syntax_declarator(FILE *stream, namespace_t *namespace, int abstract);
+void syntax_declaration(FILE *stream, namespace_t *namespace, int in_struct);
 list *syntax_postfix(FILE *stream, namespace_t *namespace);
 list *syntax_unary(FILE *stream, namespace_t *namespace);
 list *syntax_cast(FILE *stream, namespace_t *namespace);
-void syntax_conditional(FILE *stream, namespace_t *namespace);
-void syntax_assignment(FILE *stream, namespace_t *namespace);
+list *syntax_conditional(FILE *stream, namespace_t *namespace);
+list *syntax_assignment(FILE *stream, namespace_t *namespace);
 list *syntax_expression(FILE *stream, namespace_t *namespace);
 void syntax_expression_stmt(FILE *stream, namespace_t *namespace);
 void syntax_statement(FILE *stream, namespace_t *namespace);
 void syntax_declaration_or_statement(FILE *stream, namespace_t *namespace);
-void syntax_compound_stmt(FILE *stream, namespace_t *namespace);
+void syntax_compound_stmt(FILE *stream, namespace_t *namespace, list *parameter_list, int is_func);
 void syntax_if_stmt(FILE *stream, namespace_t *namespace);
 void syntax_switch_stmt(FILE *stream, namespace_t *namespace);
 void syntax_case_stmt(FILE *stream, namespace_t *namespace);
@@ -631,5 +653,6 @@ void error_message_np(int line, int column, char *message);
 void errorh_np(int line, int column);
 int type_list_eq(list *left, list *right);
 char *type_list_to_str(list *type_list);
+static inline list *type_list_copy(list *type_list);
 
 #endif /* SCAN_H */

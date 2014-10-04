@@ -592,7 +592,7 @@ FIST mem32                    ; DB /2                [8086,FPU]
 FISTP mem16                   ; DF /3                [8086,FPU] 
 FISTP mem32                   ; DB /3                [8086,FPU] 
 FISTP mem64                   ; DF /0                [8086,FPU]
-FILD loads an integer out of a memory location, converts it to a real, and pushes it on the FPU register stack. FIST converts ST0 to an integer and stores that in memory; FISTP does the same as FIST, but pops the register stack afterwards.
+FILD loads a (signed) integer out of a memory location, converts it to a real, and pushes it on the FPU register stack. FIST converts ST0 to a (signed) integer and stores that in memory; FISTP does the same as FIST, but pops the register stack afterwards.
 
 A.45 FIMUL: Floating-Point/Integer Multiplication
 

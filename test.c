@@ -1,44 +1,21 @@
-int f() { return 3; }
+// int main()
+// {
+//     int a = 423;
+//     int b = 5252;
+//     int c = a + b;
+//     int d = a - b;
+//     int e = a * b;
+//     int f = b / a;
+//     return c;
+// }
 
-int main() {
-    int dd;
-    union x {
-        int a;
-        int b;
-        int c;
-    };
-
-    enum a { r, s, t };
-
-    enum a g(int a, int b, union x c);
-
-    // int **m[3][dd         * 5 * 3];
-    // int **n[3][dd * 5 * 3 - 1];
-
-    float ff;
-
-    int xxx;
-    // xxx > m;
-    xxx > ff;
-    f > ff;
-
-    union x a, *b;
-    b > f;
-
-    ff == g;
-    *****g;
-    g + 3;
-    int x[4];
-    x + 42342;
-
-    (int ****)f;
-    ++f;
-    int ggg[3];
-    ++ggg;
-    ++3;
-    &f + ff;
-
-    5 & 3.2;
-    g & f;
-    g & 4+ & 42342;
+int main()
+{
+    float a = 423.4234;
+    float b = 5252.22;
+    // float c = a + b;
+    // float d = a - b;
+    // float e = a * b;
+    float f = b / a;
+    return 0;
 }

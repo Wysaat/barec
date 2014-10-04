@@ -100,6 +100,25 @@ void list_extend(list *first, list *second) {
     second->prev = ptr;
 }
 
+int list_len(list *head) {
+    int len = 0;
+    while(head = head->next)
+        len++;
+    return len;
+}
+
+list *list_copy(list *head)
+{
+    list *retptr = list_node(), *ptr, *ptr2 = retptr;
+    for (ptr = head->next; ptr; ptr = ptr->next) {
+        ptr2->next = list_node();
+        ptr2->next->prev = ptr2;
+        ptr2->next->content = ptr->content;
+        ptr2 = ptr2->next;
+    }
+    return retptr;
+}
+
 buffer *buff_init() {
     buffer *retptr = (buffer *)malloc(sizeof(buffer));
     retptr->prev = 0;
@@ -154,7 +173,7 @@ char *get_tag()
 }
 
 static char *type_specifiers[] = {
-    "typedef", "void", "char", "short", "int", "long", "float", "double", "signed", "unsigend", 0
+    "void", "char", "short", "int", "long", "float", "double", "signed", "unsigend", 0
 };
 
 int is_specifier(char *token)

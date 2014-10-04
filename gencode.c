@@ -4,6 +4,8 @@
 #include "barec.h"
 
 void addr_gencode(addr *expr);
+static char *bss_addr(int addr);
+static char *data_addr(int addr);
 
 void declaration_gencode(declaration *expr)
 {
@@ -22,9 +24,18 @@ void declaration_gencode(declaration *expr)
                 case unsigned_int_t: case int_t:
                     buff_add(text_buff, "mov eax, [eax]\n");
                     break;
+                case unsigned_long_t: case long_t:
+                    buff_add(text_buff, "mov eax, [eax]\n");
+                    break;
                 case unsigned_long_long_t: case long_long_t:
                     buff_add(text_buff, "mov eax, [eax]\n");
                     buff_add(text_buff, "mov edx, [eax+4]\n");
+                    break;
+                case float_t:
+                    buff_add(text_buff, "fld dword [eax]\n");
+                    break;
+                case double_t:
+                    buff_add(text_buff, "fld qword [eax]\n");
                     break;
             }
             break;
@@ -42,7 +53,6 @@ void func_gencode(func *expr)
 
 void arithmetic_gencode(arithmetic *expr)
 {
-    long long val;
     switch(((arithmetic_specifier *)expr->type_list->content)->atype) {
         case unsigned_char_t: case char_t:
             buff_add(text_buff, "mov al, ");
@@ -56,21 +66,45 @@ void arithmetic_gencode(arithmetic *expr)
             buff_add(text_buff, "mov eax, ");
             buff_addln(text_buff, expr->value);
             break;
-        case unsigned_long_long_t: case long_long_t:
+        case unsigned_long_t: case long_t:
+            buff_add(text_buff, "mov eax, ");
+            buff_addln(text_buff, expr->value);
+            break;
+        case unsigned_long_long_t: case long_long_t: {
             /* CAUTION! atoll gives wrong result if you don't include <stdlib.h> */
+            long long val;
             val = atoll(expr->value);
             buff_add(text_buff, "mov eax, ");
             buff_addln(text_buff, itoa(val & 0xffffffff));
             buff_add(text_buff, "mov edx, ");
             buff_addln(text_buff, itoa(val >> 32));
             break;
+        }
+        case float_t:
+            buff_add(text_buff, "push ");
+            buff_addln(text_buff, expr->value);
+            buff_add(text_buff,
+                "fld dword [esp]\n"
+                "pop eax\n"
+                );
+            break;
+        case double_t: {
+            char *tag = get_tag();
+            buff_add(data_buff, tag);
+            buff_add(data_buff, ":\ndq ");
+            buff_addln(data_buff, expr->value);
+            buff_add(text_buff, "fld qword [");
+            buff_add(text_buff, tag);
+            buff_add(text_buff, "]\n");
+            break;
+        }
     }
 }
 
 void string_gencode(string *expr)
 {
     buff_add(text_buff, "mov eax, ");
-    buff_addln(text_buff, itoa(expr->address));
+    buff_addln(text_buff, data_addr(expr->address));
 }
 
 void posinc_gencode(posinc *expr)
@@ -288,6 +322,20 @@ void funcall_gencode(funcall *expr)
     buff_add(text_buff, "call eax\n");
 }
 
+static char *bss_addr(int addr) {
+    char *ichar = itoa(addr);
+    char *retptr = malloc(strlen(ichar)+strlen(bss_start_tag)+1);
+    sprintf(retptr, "%s+%s", bss_start_tag, ichar);
+    return retptr;
+}
+
+static char *data_addr(int addr) {
+    char *ichar = itoa(addr);
+    char *retptr = malloc(strlen(ichar)+strlen(data_start_tag)+1);
+    sprintf(retptr, "%s+%s", data_start_tag, ichar);
+    return retptr;
+}
+
 void addr_gencode(addr *expr)
 {
     if (type(expr->expr) == declaration_t) {
@@ -296,10 +344,10 @@ void addr_gencode(addr *expr)
             auto_storage *storage = node->storage;
             if (storage->constant) {
                 buff_add(text_buff, "mov eax, ");
-                buff_addln(text_buff, itoa(storage->iaddress));
+                buff_addln(text_buff, itoa(storage->ival));
             }
             else
-                gencode(storage->vaddress);
+                gencode(storage->vval);
             buff_add(text_buff,
                 "mov ebx, ebp\n"
                 "sub ebx, eax\n"
@@ -315,7 +363,12 @@ void addr_gencode(addr *expr)
         else if (type(node->storage) == static_storage_t) {
             static_storage *storage = node->storage;
             buff_add(text_buff, "mov eax, ");
-            buff_addln(text_buff, storage->tag);
+            char *val;
+            if (storage->initialized)
+                val = data_addr(storage->ival);
+            else
+                val = bss_addr(storage->ival);
+            buff_addln(text_buff, val);
         }
     }
     else if (type(expr->expr) == string_t) {
@@ -373,57 +426,137 @@ void unary_gencode(unary *expr)
     }
 }
 
-static inline void cast_gencode_double(list *type_list, void *expr) {
-    gencode(expr);
-}
+static inline void cast_char(int lt);
+static inline void cast_short(int lt);
+static inline void cast_int(int lt);
+static inline void cast_long(int lt);
+static inline void cast_uchar(int lt);
+static inline void cast_ushort(int lt);
+static inline void cast_uint(int lt);
+static inline void cast_ulong(int lt);
+static inline void cast_double(int lt);
 
-static inline void cast_gencode_int(list *type_list, void *expr)
-{
-    gencode(expr);
-    switch (type(type_list->content)) {
-        case pointer_t: break;
-        case arithmetic_specifier_t: {
-            switch (((arithmetic_specifier *)type_list->content)->atype) {
-                case long_double_t: case double_t: case float_t:
-                    buff_add(text_buff,
-                        "push eax\n"
-                        "fild dword [esp]\n"
-                        "pop eax\n"
-                        );
-                    break;
-                case unsigned_long_long_t: case long_long_t:
-                    buff_add(text_buff, "xor edx, edx\n");
-                    break;
-                default: break;
-            }
-        }
+static inline void cast_char(int lt) {
+    switch (lt) {
+        case char_t: case unsigned_char_t: return;
+        default: buff_add(text_buff, "cbw\n"); cast_short(lt); return;
     }
 }
 
-void cast_gencode(cast *expr)
-{
-    void *rtype = get_type_list(expr->expr)->content;
-    switch (type(rtype)) {
-        case pointer_t: case array_t:
-            return cast_gencode_int(expr->type_list, expr->expr);
-        case arithmetic_specifier_t: {
-            switch (((arithmetic_specifier *)rtype)->atype) {
-                case double_t:
-                    return cast_gencode_double(expr->type_list, expr->expr);
-                case int_t:
-                    return cast_gencode_int(expr->type_list, expr->expr);
-            }
-            break;
-        }
+static inline void cast_uchar(int lt) {
+    switch (lt) {
+        case char_t: case unsigned_char_t: return;
+        default: buff_add(text_buff, "xor ah, ah\n"); cast_ushort(lt); return;
+    }
+}
+
+static inline void cast_short(int lt) {
+    switch (lt) {
+        case char_t: case unsigned_char_t: return;
+        case short_t: case unsigned_short_t: return;
+        default: buff_add(text_buff, "cwde\n"); cast_int(lt); return;
+    }
+}
+
+static inline void cast_ushort(int lt) {
+    switch (lt) {
+        case char_t: case unsigned_char_t: return;
+        case short_t: case unsigned_short_t: return;
+        default: buff_add(text_buff, "movzx eax, ax\n"); cast_uint(lt); return;
+    }
+}
+
+static inline void cast_int(int lt) {
+    switch (lt) {
+        case char_t: case unsigned_char_t: return;
+        case short_t: case unsigned_short_t: return;
+        case int_t: case unsigned_int_t: return;
+        case long_t: case unsigned_long_t: return;
+        default: buff_add(text_buff, "cdq\n"); cast_long(lt); return;
+    }
+}
+
+static inline void cast_uint(int lt) {
+    switch (lt) {
+        case char_t: case unsigned_char_t: return;
+        case short_t: case unsigned_short_t: return;
+        case int_t: case unsigned_int_t: return;
+        case long_t: case unsigned_long_t: return;
+        default: buff_add(text_buff, "xor edx, edx\n"); cast_ulong(lt); return;
+    }
+}
+
+static inline void cast_long(int lt) {
+    switch (lt) {
+        case float_t: case double_t: buff_add(text_buff, "push edx\npush eax\nfild qword [esp]\npop eax\npop edx\n"); return;
+        default: return;
+    }
+}
+
+static inline void cast_ulong(int lt) {
+    switch (lt) {
+        case float_t: case double_t: buff_add(text_buff, "push edx\npush eax\nfild qword [esp]\npop eax\npop edx\n"); return;
+        default: return;
+    }
+}
+
+static inline void cast_double(int lt) {
+    if (lt == float_t || lt == double_t)
+        return;
+    else
+        buff_add(text_buff, "add esp, 8\nfistp qword [esp]\npop eax\npop edx\n");
+}
+
+void cast_gencode(cast *expr) {
+    gencode(expr->expr);
+
+    list *llist = expr->type_list;
+    list *rlist = get_type_list(expr->expr);
+    int lt, rt;
+    if (type(llist->content) == pointer_t)
+        lt = int_t;
+    else
+        lt = ((arithmetic_specifier *)llist->content)->atype;
+    if (type(rlist->content) == pointer_t)
+        rt = int_t;
+    else
+        rt = ((arithmetic_specifier *)rlist->content)->atype;
+
+    switch (rt) {
+        case char_t: cast_char(lt); break;
+        case short_t: cast_short(lt); break;
+        case int_t: cast_int(lt); break;
+        case long_t: cast_int(lt); break;
+        case long_long_t: cast_long(lt); break;
+        case unsigned_char_t: cast_uchar(lt); break;
+        case unsigned_short_t: cast_ushort(lt); break;
+        case unsigned_int_t: cast_uint(lt); break;
+        case unsigned_long_t: cast_uint(lt); break;
+        case unsigned_long_long_t: cast_ulong(lt); break;
+        case float_t: case double_t: cast_double(lt); break;
     }
 }
 
 void binary_gencode_mul(void *left, void *right)
 {
     switch (((arithmetic_specifier *)get_type_list(left)->content)->atype) {
-        case double_t:
+        case unsigned_int_t:
+            gencode(left);
+            buff_add(text_buff, "push eax\n");
+            gencode(right);
+            buff_add(text_buff,
+                "pop ebx\n"
+                "mul ebx\n"
+                );
             break;
-        case float_t:
+        case int_t:
+            gencode(left);
+            buff_add(text_buff, "push eax\n");
+            gencode(right);
+            buff_add(text_buff,
+                "pop ebx\n"
+                "imul ebx\n"
+                );
             break;
         case unsigned_long_long_t:
             gencode(left);
@@ -498,23 +631,10 @@ void binary_gencode_mul(void *left, void *right)
                 "\n"
                 );
             break;
-        case unsigned_int_t:
+        case float_t: double_t:
             gencode(left);
-            buff_add(text_buff, "push eax\n");
             gencode(right);
-            buff_add(text_buff,
-                "pop ebx\n"
-                "mul ebx\n"
-                );
-            break;
-        case int_t:
-            gencode(left);
-            buff_add(text_buff, "push eax\n");
-            gencode(right);
-            buff_add(text_buff,
-                "pop ebx\n"
-                "imul ebx\n"
-                );
+            buff_add(text_buff, "fmul st0, st1\n");
             break;
     }
 }
@@ -522,17 +642,7 @@ void binary_gencode_mul(void *left, void *right)
 void binary_gencode_divi(btype_t btype, void *left, void *right)
 {
     switch (((arithmetic_specifier *)get_type_list(left)->content)->atype) {
-        case long_double_t:
-            break;
-        case double_t:
-            break;
-        case float_t:
-            break;
-        case unsigned_long_long_t:
-            break;
-        case long_long_t:
-            break;
-        case unsigned_long_t: case unsigned_int_t:
+        case unsigned_int_t: case unsigned_long_t:
             gencode(left);
             buff_add(text_buff, "push eax\n");
             gencode(right);
@@ -544,7 +654,7 @@ void binary_gencode_divi(btype_t btype, void *left, void *right)
                 );
             if (btype == mod) buff_add(text_buff, "mov eax, edx\n");
             break;
-        case long_t: case int_t:
+        case int_t: case long_t:
             gencode(left);
             buff_add(text_buff, "push eax\n");
             gencode(right);
@@ -555,6 +665,14 @@ void binary_gencode_divi(btype_t btype, void *left, void *right)
                 "idiv ebx\n"
                 );
             if (btype == mod) buff_add(text_buff, "mov eax, edx\n");
+            break;
+        case unsigned_long_long_t: case long_long_t:
+            fprintf(stderr, "[FATAL] in gencode.c:binary_gencode_divi\n");
+            exit(-1);
+        case float_t:
+            gencode(right);
+            gencode(left);
+            buff_add(text_buff, "fdiv st0, st1\n");
             break;
     }
 }
@@ -571,11 +689,13 @@ void binary_gencode_add(btype_t btype, void *left, void *right)
     }
 
     switch (atype) {
-        case long_double_t:
-            break;
-        case double_t:
-            break;
-        case float_t:
+        case unsigned_long_t: case long_t: case unsigned_int_t: case int_t:
+            gencode(right);
+            buff_add(text_buff, "push eax\n");
+            gencode(left);
+            buff_add(text_buff, "pop ebx\n");
+            btype == add ? buff_add(text_buff, "add eax, ebx\n")
+                         : buff_add(text_buff, "sub eax, ebx\n");
             break;
         case unsigned_long_long_t: case long_long_t:
             gencode(left);
@@ -606,13 +726,12 @@ void binary_gencode_add(btype_t btype, void *left, void *right)
                     "\n");
             }
             break;
-        case unsigned_long_t: case long_t: case unsigned_int_t: case int_t:
+        case double_t: case float_t:
             gencode(right);
-            buff_add(text_buff, "push eax\n");
             gencode(left);
-            buff_add(text_buff, "pop ebx\n");
-            btype == add ? buff_add(text_buff, "add eax, ebx\n")
-                         : buff_add(text_buff, "sub eax, ebx\n");
+            btype == add ?
+                buff_add(text_buff, "fadd st0, st1\n") :
+                buff_add(text_buff, "fsub st0, st1\n");
             break;
     }
 }
@@ -689,7 +808,7 @@ void binary_gencode_relational(btype_t btype, void *left, void *right)
             gencode(right);
             buff_add(text_buff,
                 "pop bx\n"
-                "cmp bx, al\n"
+                "cmp bl, al\n"
                 );
             break;
     }
@@ -851,6 +970,12 @@ void assignment_gencode(assignment *expr)
                         "mov [ebx+4], edx\n"
                         );
                     break;
+                case float_t:
+                    buff_add(text_buff, "fst dword [ebx]\n");
+                    break;
+                case double_t:
+                    buff_add(text_buff, "fst qword [ebx]\n");
+                    break;
             }
             break;
         case struct_specifier_t: {
@@ -883,7 +1008,7 @@ static inline char *constant_value(void *constant)
     }
 }
 
-static inline void sig_subproc1(void *body)
+static void sig_subproc1(void *body)
 {
     if (type(body) == compound_stmt_t) {
         compound_stmt *stmt = body;
@@ -903,7 +1028,7 @@ static inline void sig_subproc1(void *body)
     }
 }
 
-static inline void sig_subproc2(void *body)
+static void sig_subproc2(void *body)
 {
     if (type(body) == compound_stmt_t) {
         compound_stmt *stmt = body;
@@ -922,16 +1047,10 @@ static inline void sig_subproc2(void *body)
 void static_initialization_gencode(static_initialization *initial)
 {
     list *ptr;
-    if (initial->initialized) {
-        buff_add(data_buff, initial->tag);
-        buff_add(data_buff, ":\n");
+    if (initial->initialized)
         sig_subproc1(initial->body);
-    }
-    else {
-        buff_add(bss_buff, initial->tag);
-        buff_add(bss_buff, ":\n");
+    else
         sig_subproc2(initial->body);
-    }
 }
 
 void expression_gencode(expression *expr)
@@ -1186,6 +1305,8 @@ void gencode(void *expr)
 void translation_unit_gencode(translation_unit_t *translation_unit)
 {
     list *ptr;
-    for (ptr = translation_unit->external_declarations->next; ptr; ptr = ptr->next)
+    for (ptr = translation_unit->external_declarations->next; ptr; ptr = ptr->next) {
         gencode(ptr->content);
+        buff_add(text_buff, "\n");
+    }
 }
