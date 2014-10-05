@@ -32,10 +32,16 @@ void declaration_gencode(declaration *expr)
                     buff_add(text_buff, "mov edx, [eax+4]\n");
                     break;
                 case float_t:
-                    buff_add(text_buff, "fld dword [eax]\n");
+                    buff_add(text_buff,
+                        "ffree st0\n"
+                        "fld dword [eax]\n"
+                        );
                     break;
                 case double_t:
-                    buff_add(text_buff, "fld qword [eax]\n");
+                    buff_add(text_buff,
+                        "ffree st0\n"
+                        "fld qword [eax]\n"
+                        );
                     break;
             }
             break;
@@ -71,7 +77,7 @@ void arithmetic_gencode(arithmetic *expr)
             buff_addln(text_buff, expr->value);
             break;
         case unsigned_long_long_t: case long_long_t: {
-            /* CAUTION! atoll gives wrong result if you don't include <stdlib.h> */
+            /* CAUTION! atoll gives wrong results if you don't include <stdlib.h> */
             long long val;
             val = atoll(expr->value);
             buff_add(text_buff, "mov eax, ");
@@ -81,6 +87,7 @@ void arithmetic_gencode(arithmetic *expr)
             break;
         }
         case float_t:
+            buff_add(text_buff, "ffree st0\n");
             buff_add(text_buff, "push ");
             buff_addln(text_buff, expr->value);
             buff_add(text_buff,
@@ -89,6 +96,7 @@ void arithmetic_gencode(arithmetic *expr)
                 );
             break;
         case double_t: {
+            buff_add(text_buff, "ffree st0\n");
             char *tag = get_tag();
             buff_add(data_buff, tag);
             buff_add(data_buff, ":\ndq ");
@@ -504,7 +512,7 @@ static inline void cast_double(int lt) {
     if (lt == float_t || lt == double_t)
         return;
     else
-        buff_add(text_buff, "add esp, 8\nfistp qword [esp]\npop eax\npop edx\n");
+        buff_add(text_buff, "sub esp, 8\nfistp qword [esp]\npop eax\npop edx\n");
 }
 
 void cast_gencode(cast *expr) {
@@ -631,10 +639,30 @@ void binary_gencode_mul(void *left, void *right)
                 "\n"
                 );
             break;
-        case float_t: double_t:
+        case float_t:
             gencode(left);
+            buff_add(text_buff,
+                "sub esp, 4\n"
+                "fst dword [esp]\n"
+                );
             gencode(right);
-            buff_add(text_buff, "fmul st0, st1\n");
+            buff_add(text_buff,
+                "fmul dword [esp]\n"
+                "pop eax\n"
+                );
+            break;
+        case double_t:
+            gencode(left);
+            buff_add(text_buff,
+                "sub esp, 8\n"
+                "fst qword [esp]\n"
+                );
+            gencode(right);
+            buff_add(text_buff,
+                "fmul qword [esp]\n"
+                "pop eax\n"
+                "pop eax\n"
+                );
             break;
     }
 }
@@ -671,8 +699,28 @@ void binary_gencode_divi(btype_t btype, void *left, void *right)
             exit(-1);
         case float_t:
             gencode(right);
+            buff_add(text_buff,
+                "sub esp, 4\n"
+                "fst dword [esp]\n"
+                );
             gencode(left);
-            buff_add(text_buff, "fdiv st0, st1\n");
+            buff_add(text_buff,
+                "fdiv dword [esp]\n"
+                "pop eax\n"
+                );
+            break;
+        case double_t:
+            gencode(right);
+            buff_add(text_buff,
+                "sub esp, 8\n"
+                "fst qword [esp]\n"
+                );
+            gencode(left);
+            buff_add(text_buff,
+                "fdiv qword [esp]\n"
+                "pop eax\n"
+                "pop eax\n"
+                );
             break;
     }
 }
@@ -726,12 +774,41 @@ void binary_gencode_add(btype_t btype, void *left, void *right)
                     "\n");
             }
             break;
-        case double_t: case float_t:
+        case float_t:
             gencode(right);
+            buff_add(text_buff,
+                "sub esp, 4\n"
+                "fst dword [esp]\n"
+                );
             gencode(left);
             btype == add ?
-                buff_add(text_buff, "fadd st0, st1\n") :
-                buff_add(text_buff, "fsub st0, st1\n");
+                buff_add(text_buff,
+                    "fadd dword [esp]\n"
+                    "pop eax\n"
+                    ) :
+                buff_add(text_buff,
+                    "fsub dword [esp]\n"
+                    "pop eax\n"
+                    );
+            break;
+        case double_t:
+            gencode(right);
+            buff_add(text_buff,
+                "sub esp, 8\n"
+                "fst qword [esp]\n"
+                );
+            gencode(left);
+            btype == add ?
+                buff_add(text_buff,
+                    "fadd qword [esp]\n"
+                    "pop eax\n"
+                    "pop eax\n"
+                    ) :
+                buff_add(text_buff,
+                    "fsub qword [esp]\n"
+                    "pop eax\n"
+                    "pop eax\n"
+                    );
             break;
     }
 }

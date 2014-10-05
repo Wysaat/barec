@@ -13,9 +13,9 @@ int main()
 {
     float a = 423.4234;
     float b = 5252.22;
-    // float c = a + b;
-    // float d = a - b;
-    // float e = a * b;
+    float c = a + b;
+    float d = a - b;
+    float e = a * b;
     float f = b / a;
     return 0;
 }

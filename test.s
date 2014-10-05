@@ -11,13 +11,14 @@ section .text
 _start:
 push ebp
 mov ebp, esp
-mov eax, 12
+mov eax, 24
 sub esp, eax
 mov eax, 4
 mov ebx, ebp
 sub ebx, eax
 mov eax, ebx
 push eax
+ffree st0
 fld qword [t3]
 pop ebx
 fst dword [ebx]
@@ -26,6 +27,7 @@ mov ebx, ebp
 sub ebx, eax
 mov eax, ebx
 push eax
+ffree st0
 fld qword [t4]
 pop ebx
 fst dword [ebx]
@@ -34,17 +36,91 @@ mov ebx, ebp
 sub ebx, eax
 mov eax, ebx
 push eax
-mov eax, 4
-mov ebx, ebp
-sub ebx, eax
-mov eax, ebx
-fld dword [eax]
 mov eax, 8
 mov ebx, ebp
 sub ebx, eax
 mov eax, ebx
+ffree st0
 fld dword [eax]
-fdiv st0, st1
+sub esp, 4
+fst dword [esp]
+mov eax, 4
+mov ebx, ebp
+sub ebx, eax
+mov eax, ebx
+ffree st0
+fld dword [eax]
+fadd dword [esp]
+pop eax
+pop ebx
+fst dword [ebx]
+mov eax, 16
+mov ebx, ebp
+sub ebx, eax
+mov eax, ebx
+push eax
+mov eax, 8
+mov ebx, ebp
+sub ebx, eax
+mov eax, ebx
+ffree st0
+fld dword [eax]
+sub esp, 4
+fst dword [esp]
+mov eax, 4
+mov ebx, ebp
+sub ebx, eax
+mov eax, ebx
+ffree st0
+fld dword [eax]
+fsub dword [esp]
+pop eax
+pop ebx
+fst dword [ebx]
+mov eax, 20
+mov ebx, ebp
+sub ebx, eax
+mov eax, ebx
+push eax
+mov eax, 4
+mov ebx, ebp
+sub ebx, eax
+mov eax, ebx
+ffree st0
+fld dword [eax]
+sub esp, 4
+fst dword [esp]
+mov eax, 8
+mov ebx, ebp
+sub ebx, eax
+mov eax, ebx
+ffree st0
+fld dword [eax]
+fmul dword [esp]
+pop eax
+pop ebx
+fst dword [ebx]
+mov eax, 24
+mov ebx, ebp
+sub ebx, eax
+mov eax, ebx
+push eax
+mov eax, 4
+mov ebx, ebp
+sub ebx, eax
+mov eax, ebx
+ffree st0
+fld dword [eax]
+sub esp, 4
+fst dword [esp]
+mov eax, 8
+mov ebx, ebp
+sub ebx, eax
+mov eax, ebx
+ffree st0
+fld dword [eax]
+fdiv dword [esp]
+pop eax
 pop ebx
 fst dword [ebx]
 mov eax, 0
