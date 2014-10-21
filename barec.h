@@ -506,6 +506,7 @@ typedef_t *typedef_init(char *id, list *type_list);
 void errorh();
 func *func_init(char *id, char *tag, list *type_list);
 inline struct size *size_cpy(struct size *ptr);
+func *find_func(namespace_t *namespace, char *id);
 
 /*
  * parse.c
@@ -559,6 +560,7 @@ struct size *size_init(int constant, int ival, void *vval);
 struct size *size(list *type_list);
 void storage_add_size(auto_storage *left, struct size *right);
 auto_storage *auto_storage_add_size_nip(auto_storage *left, struct size *right);
+auto_storage *auto_storage_sub_size_nip(auto_storage *left, struct size *right);
 
 /*
  * utils.c

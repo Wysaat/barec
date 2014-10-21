@@ -176,6 +176,31 @@ auto_storage *auto_storage_add_size_nip(auto_storage *left, struct size *right)
     return auto_storage_init(constant, ival, vval);
 }
 
+auto_storage *auto_storage_sub_size_nip(auto_storage *left, struct size *right)
+{
+    int constant;
+    int ival = 0;
+    void *vval = 0;
+    if (left->constant) {
+        if (right->constant) {
+            constant = 1;
+            ival = left->ival - right->ival;
+        }
+        else {
+            constant = 0;
+            vval = BINARY(sub, ARITHMETIC(itoa(left->ival), int_t), right->vval);
+        }
+    }
+    else {
+        constant = 0;
+        if (right->constant)
+            vval = BINARY(sub, left->vval, ARITHMETIC(itoa(right->ival), int_t));
+        else
+            vval = BINARY(sub, left->vval, right->vval);
+    }
+    return auto_storage_init(constant, ival, vval);
+}
+
 declaration *STRUCT_REF(void *primary, char *id) {
     struct_specifier *specifier = get_type_list(primary)->content;
     list *ptr;

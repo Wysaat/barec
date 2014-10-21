@@ -31,16 +31,58 @@
 //     return b;
 // }
 
-struct tom {
-    char a;
-    int b;
-    long c;
-    long long d;
-};
+// struct tom {
+//     char a;
+//     float b;
+//     long c;
+//     long long d;
+// };
+
+// struct tom tom = { 100, 2000.3, 30000, 400000 };
+
+// int main()
+// {
+//     float g = tom.a + tom.b + tom.c + tom.d;
+//     return 3;
+// }
+
+// int main()
+// {
+//     // int a = 3;
+//     // int b = 423;
+//     // int c = a > b;
+//     // int d = a < b;
+//     // int e = a == b;
+//     // int a = 423;
+//     // int b = 3;
+//     // int c = a >> b;
+//     // int d = a << b;
+
+//     // int a[] = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
+//     // int i, res = 0;
+//     // for (i = 0; i < 10; i++)
+//     //     res += a[i];
+//     // return res;
+
+//     // static int a[] = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
+//     // int i, res = 0;
+//     // for (i = 0; i < 10; i++)
+//     //     res += a[i];
+//     // return res;
+// }
+
+int f(int x) {
+    if (x > 4)
+        return x * 4;
+    else
+        return x / 4;
+}
 
 int main()
 {
-    struct tom tom = { 1, 2, 3, 400000 };
-    int g = tom.a + tom.b + tom.c + tom.d;
-    return g;
+    int a = 4234;
+    int b = -42;
+    int c = f(a);
+    int d = f(b);
+    return d;
 }

@@ -1279,7 +1279,7 @@ list *syntax_primary(FILE *stream, namespace_t *namespace)
         return retptr;
     }
     else if (is_id(token)) {
-        declaration *dptr = find_declaration(namespace, token);
+        declaration *dptr = find_identifier(namespace, token);
         if (!dptr) {
             unscan(token, stream);
             errorh();

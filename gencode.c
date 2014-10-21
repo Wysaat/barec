@@ -28,8 +28,9 @@ void declaration_gencode(declaration *expr)
                     buff_add(text_buff, "mov eax, [eax]\n");
                     break;
                 case unsigned_long_long_t: case long_long_t:
-                    buff_add(text_buff, "mov eax, [eax]\n");
-                    buff_add(text_buff, "mov edx, [eax+4]\n");
+                    buff_add(text_buff, "mov ecx, eax\n");
+                    buff_add(text_buff, "mov eax, [ecx]\n");
+                    buff_add(text_buff, "mov edx, [ecx+4]\n");
                     break;
                 case float_t:
                     buff_add(text_buff,
@@ -272,15 +273,17 @@ void preinc_gencode(preinc *expr)
                 case unsigned_long_long_t: case long_long_t:
                     if (expr->inc)
                         buff_add(text_buff,
-                            "inc qword [eax]\n"
-                            "mov eax, [eax]\n"
-                            "mov edx, [eax+4]\n"
+                            "mov ecx, eax\n"
+                            "inc qword [ecx]\n"
+                            "mov eax, [ecx]\n"
+                            "mov edx, [ecx+4]\n"
                             );
                     else
                         buff_add(text_buff,
-                            "dec qword [eax]\n"
-                            "mov eax, [eax]\n"
-                            "mov edx, [eax+4]\n"
+                            "mov ecx, eax\n"
+                            "dec qword [ecx]\n"
+                            "mov eax, [ecx]\n"
+                            "mov edx, [ecx+4]\n"
                             );
                     break;
                 case unsigned_long_t: case long_t: case unsigned_int_t: case int_t:
@@ -512,8 +515,9 @@ void indirection_gencode(indirection *expr)
                 return;
             case unsigned_long_long_t: case long_long_t:
                 buff_add(text_buff,
-                    "mov eax, [eax]\n"
-                    "mov edx, [eax+4]\n"
+                    "mov ecx, eax\n"
+                    "mov eax, [ecx]\n"
+                    "mov edx, [ecx+4]\n"
                     );
                 return;
         }
@@ -1145,6 +1149,9 @@ void assignment_gencode(assignment *expr)
                 case unsigned_int_t: case int_t:
                     buff_add(text_buff, "mov [ebx], eax\n");
                     break;
+                case unsigned_long_t: case long_t:
+                    buff_add(text_buff, "mov [ebx], eax\n");
+                    break;
                 case unsigned_long_long_t: case long_long_t:
                     buff_add(text_buff,
                         "mov [ebx], eax\n"
@@ -1386,8 +1393,8 @@ void for_stmt_gencode(for_stmt *stmt)
     buff_add(text_buff, stmt->continue_tag);
     buff_add(text_buff, ":\n");
     if (stmt->expr2) {
-        gencode(BINARY(eq, stmt->expr2, ARITHMETIC(strdup("0"), int_t)));
-        buff_add(text_buff, "test eax, eax\n");
+        gencode(BINARY(neq, stmt->expr2, ARITHMETIC(strdup("0"), int_t)));
+        buff_add(text_buff, "cmp eax, 0\n");
         buff_add(text_buff, "jne ");
         buff_addln(text_buff, ftag);
     }
