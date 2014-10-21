@@ -1010,7 +1010,7 @@ static void syntax_initializing(list *llist, void *initializer)
                 int column = init_info->column;
                 if (llist->type == function_t)
                     error_message_np(line, column, "illegal initializer");
-                else {
+                else if (rlist) {
                     int lt = type(llist->content), rt = type(rlist->content);
                     if (lt == arithmetic_specifier_t && (rt == pointer_t || rt == array_t || rt == function_t)) {
                         arithmetic_specifier *s = llist->content;
@@ -3169,7 +3169,8 @@ void syntax_external_declaration(FILE *stream, namespace_t *namespace)
     void *specifier = specifiers->next->next->content;
     if (!storage)
         storage = static_storage_init(-1, -1);
-    ((static_storage *)storage)->initialized = -1;
+    if (type(storage) == static_storage_t)
+        ((static_storage *)storage)->initialized = -1;
     char *token = scan(stream);
     if (!strcmp(token, ";"))
         return;

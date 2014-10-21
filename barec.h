@@ -505,6 +505,8 @@ list *parse_parameter_list(FILE *stream, struct namespace *namespace);
 typedef_t *typedef_init(char *id, list *type_list);
 void errorh();
 func *func_init(char *id, char *tag, list *type_list);
+inline struct size *size_cpy(struct size *ptr);
+
 /*
  * parse.c
  */

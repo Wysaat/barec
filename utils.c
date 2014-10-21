@@ -168,12 +168,12 @@ char *get_tag()
     char *retptr = (char *)malloc(strlen(t) + 1 + 1);
     *retptr = 't';
     strcpy(retptr+1, t);
-    retptr[strlen(t)+2] = 0;
+    retptr[strlen(t)+1] = 0;
     return retptr;
 }
 
 static char *type_specifiers[] = {
-    "void", "char", "short", "int", "long", "float", "double", "signed", "unsigend", 0
+    "void", "char", "short", "int", "long", "float", "double", "signed", "unsigned", 0
 };
 
 int is_specifier(char *token)

@@ -254,9 +254,11 @@ static inline int arith_size(arithmetic_specifier *ptr)
         case unsigned_char_t: case char_t: return 1;
         case unsigned_short_t: case short_t: return 2;
         case unsigned_int_t: case int_t: return 4;
+        case unsigned_long_t: case long_t: return 4;
         case unsigned_long_long_t: case long_long_t: return 8;
         case float_t: return 4;
         case double_t: return 8;
+        case long_double_t: fprintf(stderr, "FATAL in parse.c:arith_size"); exit(-1);
     }
 }
 

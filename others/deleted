@@ -1,3 +1,123 @@
+void *parse_external_declaration(FILE *stream, namespace_t *namespace)
+{
+    list *specifiers = parse_specifier(stream, namespace);
+    void *storage = specifiers->next->content;
+    void *specifier = specifiers->next->next->content;
+    if (!storage)
+        storage = static_storage_init(0, 0);
+    char *token = scan(stream);
+    if (!strcmp(token, ";"))
+        return 0;
+    unscan(token, stream);
+    list *stmt_list = list_node();
+    while (1) {
+        declarator *dptr = parse_declarator(stream, 0, namespace);
+        list *type_list = dptr->type_list;
+        list *ptr = type_list;
+        while (ptr->next)
+            ptr = ptr->next;
+        if (specifier && type(specifier) == list_t) {
+            if (!ptr->prev) {
+                free(type_list);
+                type_list = specifier;
+            }
+            else {
+                list *last = ptr->prev;
+                free(ptr);
+                last->next = specifier;
+                last->next->prev = last;
+            }
+        }
+        else
+            ptr->content = specifier;
+        char *id = dptr->id;
+
+        declaration *node = 0;
+        func *func_ = 0;
+
+        if (type(storage) != typedef_storage_t && !find_identifier(namespace, id)) {
+            if (type(type_list->content) == function_t) {
+                func_ = func_init(id, 0, type_list);
+                list_append(func_list, func_);
+            }
+            else {
+                node = declaration_init(id, 0, type_list);
+                list_append(namespace->declaration_list, node);
+            }
+        }
+        else
+            list_append(namespace->typedefs, typedef_init(id, type_list));
+
+        token = scan(stream);
+
+        if (!strcmp(token, "{")) {
+            function *f = type_list->content;
+            list *ptr;
+            int psize = 0;
+            for (ptr = f->parameter_list->next; ptr; ptr = ptr->next) {
+                declaration *d = ptr->content;
+                parameter_storage *storage = parameter_storage_init();
+                storage->address = psize;
+                struct size *thesize = size(d->type_list);
+                psize += thesize->ival;
+                d->storage = storage;
+            }
+            unscan(token ,stream);
+            func_->tag = !strcmp(id, "main") ? strdup("_start") : get_tag();
+            list *parameter_list = ((function *)type_list->content)->parameter_list;
+            list *return_type_list = list_copy(type_list->next);
+            return_tag = get_tag();
+            compound_stmt *body = parse_compound_stmt(stream, namespace, list_copy(parameter_list));
+            function_definition_t *retptr = function_definition_init(id, return_type_list, parameter_list, body, return_tag, func_->tag);
+            return retptr;
+        }
+
+        void *initializer = 0;
+        int got_eq = 0;
+        if (!strcmp(token, "=")) {
+            void *initializer = parse_initializer(stream, namespace);
+            got_eq = 1;
+            token = scan(stream);
+        }
+
+        if (type(storage) == static_storage_t) {
+            if (got_eq) {
+                if (initialized) {
+                    node->storage = static_storage_init(data_size, 1);
+                    data_size += size(type_list)->ival;
+                }
+                else {
+                    node->storage = static_storage_init(bss_size, 0);
+                    bss_size += size(type_list)->ival;
+                }
+                if (type(type_list->content) == struct_specifier_t)
+                    struct_def(node);
+            }
+            else if (type(type_list->content) != function_t)
+                node->storage = static_storage_init(-1, -1);
+        }
+
+        void *stmt = 0;
+        int initialized = initializer ? 1 : 0;
+        stmt = initializing(node, initializer);
+        if (stmt) {
+            if (type(storage) == static_storage_t) {
+                compound_stmt *body;
+                if (type(stmt) == compound_stmt_t)
+                    body = stmt;
+                else {
+                    list *stmts = list_node();
+                    list_append(stmts, stmt);
+                    body = COMPOUND_STMT(stmts, 0);
+                }
+                list_append(stmt_list, static_initialization_init(body, initialized));
+            }
+        }
+        if (!strcmp(token, ";"))
+            return COMPOUND_STMT(stmt_list, 0);
+    }
+}
+
 void parse_primary_expression(FILE *stream, scope *local_scope) {
     char *token = scan(stream);
     // convention: put the address on ebx, for assignments

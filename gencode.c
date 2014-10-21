@@ -125,11 +125,18 @@ void posinc_gencode(posinc *expr)
             gencode(ADDR(expr->primary));
             buff_add(text_buff, "push eax\n");
             gencode(size_expr(type_list->next));
-            buff_add(text_buff,
-                "pop ebx\n"
-                "add [ebx], eax\n"
-                "pop eax\n"
-                );
+            if (expr->inc)
+                buff_add(text_buff,
+                    "pop ebx\n"
+                    "add [ebx], eax\n"
+                    "pop eax\n"
+                    );
+            else
+                buff_add(text_buff,
+                    "pop ebx\n"
+                    "sub [ebx], eax\n"
+                    "pop eax\n"
+                    );
             break;
         }
         case arithmetic_specifier_t: {
@@ -141,53 +148,94 @@ void posinc_gencode(posinc *expr)
                         "push eax\n"
                         );
                     gencode(ADDR(expr->primary));
-                    buff_add(text_buff,
-                        "inc qword [eax]\n"
-                        "pop eax\n"
-                        "pop edx\n"
-                        );
+                    if (expr->inc)
+                        buff_add(text_buff,
+                            "inc qword [eax]\n"
+                            "pop eax\n"
+                            "pop edx\n"
+                            );
+                    else
+                        buff_add(text_buff,
+                            "dec qword [eax]\n"
+                            "pop eax\n"
+                            "pop edx\n"
+                            );
                     break;
                 case unsigned_long_t: case long_t: case unsigned_int_t: case int_t:
                     buff_add(text_buff, "push eax\n");
                     gencode(ADDR(expr->primary));
-                    buff_add(text_buff,
-                        "inc dword [eax]\n"
-                        "pop eax\n"
-                        );
+                    if (expr->inc)
+                        buff_add(text_buff,
+                            "inc dword [eax]\n"
+                            "pop eax\n"
+                            );
+                    else
+                        buff_add(text_buff,
+                            "dec dword [eax]\n"
+                            "pop eax\n"
+                            );
                     break;
                 case unsigned_short_t: case short_t:
                     buff_add(text_buff, "push eax\n");
                     gencode(ADDR(expr->primary));
-                    buff_add(text_buff,
-                        "inc word [eax]\n"
-                        "pop eax\n"
-                        );
+                    if (expr->inc)
+                        buff_add(text_buff,
+                            "inc word [eax]\n"
+                            "pop eax\n"
+                            );
+                    else
+                        buff_add(text_buff,
+                            "dec word [eax]\n"
+                            "pop eax\n"
+                            );
                     break;
                 case unsigned_char_t: case char_t:
                     buff_add(text_buff, "push eax\n");
                     gencode(ADDR(expr->primary));
-                    buff_add(text_buff,
-                        "inc word [eax]\n"
-                        "pop eax\n"
-                        );
+                    if (expr->inc)
+                        buff_add(text_buff,
+                            "inc word [eax]\n"
+                            "pop eax\n"
+                            );
+                    else
+                        buff_add(text_buff,
+                            "dec word [eax]\n"
+                            "pop eax\n"
+                            );
                     break;
                 case float_t:
                     gencode(ADDR(expr->primary));
-                    buff_add(text_buff,
-                        "fld word [eax]\n"
-                        "fld1\n"
-                        "faddp\n"
-                        "fstp word [eax]\n"
-                        );
+                    if (expr->inc)
+                        buff_add(text_buff,
+                            "fld dword [eax]\n"
+                            "fld1\n"
+                            "faddp\n"
+                            "fstp dword [eax]\n"
+                            );
+                    else
+                        buff_add(text_buff,
+                            "fld dword [eax]\n"
+                            "fld1\n"
+                            "fsubp\n"
+                            "fstp dword [eax]\n"
+                            );
                     break;
                 case double_t:
                     gencode(ADDR(expr->primary));
-                    buff_add(text_buff,
-                        "fld dword [eax]\n"
-                        "fld1\n"
-                        "faddp\n"
-                        "fstp dword [eax]\n"
-                        );
+                    if (expr->inc)
+                        buff_add(text_buff,
+                            "fld qword [eax]\n"
+                            "fld1\n"
+                            "faddp\n"
+                            "fstp qword [eax]\n"
+                            );
+                    else
+                        buff_add(text_buff,
+                            "fld qword [eax]\n"
+                            "fld1\n"
+                            "fsubp\n"
+                            "fstp qword [eax]\n"
+                            );
                     break;
             }
             break;
@@ -203,11 +251,18 @@ void preinc_gencode(preinc *expr)
             gencode(ADDR(expr->expr));
             buff_add(text_buff, "push eax\n");
             gencode(size_expr(type_list->next));
-            buff_add(text_buff,
-                "pop ebx\n"
-                "add [ebx], eax\n"
-                "mov eax, [ebx]\n"
-                );
+            if (expr->inc)
+                buff_add(text_buff,
+                    "pop ebx\n"
+                    "add [ebx], eax\n"
+                    "mov eax, [ebx]\n"
+                    );
+            else
+                buff_add(text_buff,
+                    "pop ebx\n"
+                    "sub [ebx], eax\n"
+                    "mov eax, [ebx]\n"
+                    );
             break;
         }
         case arithmetic_specifier_t: {
@@ -215,45 +270,90 @@ void preinc_gencode(preinc *expr)
             arithmetic_specifier *specifier = type_list->content;
             switch (specifier->atype) {
                 case unsigned_long_long_t: case long_long_t:
-                    buff_add(text_buff,
-                        "inc qword [eax]\n"
-                        "mov eax, [eax]\n"
-                        "mov edx, [eax+4]\n"
-                        );
+                    if (expr->inc)
+                        buff_add(text_buff,
+                            "inc qword [eax]\n"
+                            "mov eax, [eax]\n"
+                            "mov edx, [eax+4]\n"
+                            );
+                    else
+                        buff_add(text_buff,
+                            "dec qword [eax]\n"
+                            "mov eax, [eax]\n"
+                            "mov edx, [eax+4]\n"
+                            );
                     break;
                 case unsigned_long_t: case long_t: case unsigned_int_t: case int_t:
-                    buff_add(text_buff,
-                        "inc dword [eax]\n"
-                        "mov eax, [eax]\n"
-                        );
+                    if (expr->inc)
+                        buff_add(text_buff,
+                            "inc dword [eax]\n"
+                            "mov eax, [eax]\n"
+                            );
+                    else
+                        buff_add(text_buff,
+                            "dec dword [eax]\n"
+                            "mov eax, [eax]\n"
+                            );
                     break;
                 case unsigned_short_t: case short_t:
-                    buff_add(text_buff,
-                        "inc word [eax]\n"
-                        "mov ax, [eax]\n"
-                        );
+                    if (expr->inc)
+                        buff_add(text_buff,
+                            "inc word [eax]\n"
+                            "mov ax, [eax]\n"
+                            );
+                    else
+                        buff_add(text_buff,
+                            "dec word [eax]\n"
+                            "mov ax, [eax]\n"
+                            );
                     break;
                 case unsigned_char_t: case char_t:
-                    buff_add(text_buff,
-                        "inc byte [eax]\n"
-                        "mov al, [eax]\n"
-                        );
+                    if (expr->inc)
+                        buff_add(text_buff,
+                            "inc byte [eax]\n"
+                            "mov al, [eax]\n"
+                            );
+                    else
+                        buff_add(text_buff,
+                            "dec byte [eax]\n"
+                            "mov al, [eax]\n"
+                            );
                     break;
                 case float_t:
-                    buff_add(text_buff,
-                        "fld word [eax]\n"
-                        "fld1\n"
-                        "faddp\n"
-                        "fst word [eax]\n"
-                        );
+                    if (expr->inc)
+                        buff_add(text_buff,
+                            "ffree st0\n"
+                            "fld dword [eax]\n"
+                            "fld1\n"
+                            "faddp\n"
+                            "fst dword [eax]\n"
+                            );
+                    else
+                        buff_add(text_buff,
+                            "ffree st0\n"
+                            "fld dword [eax]\n"
+                            "fld1\n"
+                            "fsubp\n"
+                            "fst dword [eax]\n"
+                            );
                     break;
                 case double_t:
-                    buff_add(text_buff,
-                        "fld dword [eax]\n"
-                        "fld1\n"
-                        "faddp\n"
-                        "fst dword [eax]\n"
-                        );
+                    if (expr->inc)
+                        buff_add(text_buff,
+                            "ffree st0\n"
+                            "fld qword [eax]\n"
+                            "fld1\n"
+                            "faddp\n"
+                            "fst qword [eax]\n"
+                            );
+                    else
+                        buff_add(text_buff,
+                            "ffree st0\n"
+                            "fld qword [eax]\n"
+                            "fld1\n"
+                            "fsubp\n"
+                            "fst qword [eax]\n"
+                            );
                     break;
             }
             break;
@@ -339,7 +439,7 @@ static char *bss_addr(int addr) {
 
 static char *data_addr(int addr) {
     char *ichar = itoa(addr);
-    char *retptr = malloc(strlen(ichar)+strlen(data_start_tag)+1);
+    char *retptr = malloc(strlen(ichar)+strlen(data_start_tag)+2);
     sprintf(retptr, "%s+%s", data_start_tag, ichar);
     return retptr;
 }
@@ -395,7 +495,7 @@ void addr_gencode(addr *expr)
 void indirection_gencode(indirection *expr)
 {
     gencode(expr->expr);
-    if (type(expr->type_list->content) == arithmetic_t) {
+    if (type(expr->type_list->content) == arithmetic_specifier_t) {
         arithmetic_specifier *a = expr->type_list->content;
         switch (a->atype) {
             case unsigned_char_t: case char_t:
@@ -407,6 +507,9 @@ void indirection_gencode(indirection *expr)
             case unsigned_int_t: case int_t:
                 buff_add(text_buff, "mov eax, [eax]\n");
                 return;
+            case unsigned_long_t: case long_t:
+                buff_add(text_buff, "mov eax, [eax]\n");
+                return;
             case unsigned_long_long_t: case long_long_t:
                 buff_add(text_buff,
                     "mov eax, [eax]\n"
@@ -415,6 +518,8 @@ void indirection_gencode(indirection *expr)
                 return;
         }
     }
+    else if (type(expr->type_list->content) == pointer_t || type(expr->type_list->content) == array_t)
+        buff_add(text_buff, "mov eax, [eax]\n");
 }
 
 void unary_gencode(unary *expr)
@@ -842,7 +947,6 @@ void binary_gencode_shift(btype_t btype, void *left, void *right)
 void binary_gencode_relational(btype_t btype, void *left, void *right)
 {
     enum atypes atype;
-
     switch (type(get_type_list(left)->content)) {
         case arithmetic_specifier_t:
             atype = ((arithmetic_specifier *)get_type_list(left)->content)->atype;
@@ -895,19 +999,19 @@ void binary_gencode_relational(btype_t btype, void *left, void *right)
         case unsigned_long_long_t: case unsigned_long_t: case unsigned_int_t:
         case unsigned_short_t: case unsigned_char_t:
             btype == lt ? buff_add(text_buff, "setb al\n") :
-                     gt ? buff_add(text_buff, "seta al\n") :
-                     le ? buff_add(text_buff, "setbe al\n") :
-                     ge ? buff_add(text_buff, "setae al\n") :
-                     eq ? buff_add(text_buff, "sete al\n") :
+            btype == gt ? buff_add(text_buff, "seta al\n") :
+            btype == le ? buff_add(text_buff, "setbe al\n") :
+            btype == ge ? buff_add(text_buff, "setae al\n") :
+            btype == eq ? buff_add(text_buff, "sete al\n") :
                           buff_add(text_buff, "setne al\n");
             buff_add(text_buff, "movzx eax, al\n");
             break;
         case long_long_t: case long_t: case int_t: case short_t: case char_t:
             btype == lt ? buff_add(text_buff, "setl al\n") :
-                     gt ? buff_add(text_buff, "setg al\n") :
-                     le ? buff_add(text_buff, "setle al\n") :
-                     ge ? buff_add(text_buff, "setge al\n") :
-                     eq ? buff_add(text_buff, "sete al\n") :
+            btype == gt ? buff_add(text_buff, "setg al\n") :
+            btype == le ? buff_add(text_buff, "setle al\n") :
+            btype == ge ? buff_add(text_buff, "setge al\n") :
+            btype == eq ? buff_add(text_buff, "sete al\n") :
                           buff_add(text_buff, "setne al\n");
             buff_add(text_buff, "movzx eax, al\n");
             break;
@@ -926,7 +1030,7 @@ void binary_gencode_bitwise(btype_t btype, void *left, void *right)
             gencode(right);
             buff_add(text_buff, "pop ebx\n");
             btype == band ? buff_add(text_buff, "and eax, ebx\n") :
-                     bxor ? buff_add(text_buff, "xor eax, ebx\n") :
+            btype == bxor ? buff_add(text_buff, "xor eax, ebx\n") :
                             buff_add(text_buff, "or eax, ebx\n");
             break;
     }
@@ -1261,7 +1365,7 @@ void while_stmt_gencode(while_stmt *stmt)
     buff_add(text_buff, ":\n");
     gencode(BINARY(eq, stmt->expr, ARITHMETIC(strdup("0"), int_t)));
     buff_add(text_buff, "test eax, eax\n");
-    buff_add(text_buff, "jne ");
+    buff_add(text_buff, "jz ");
     buff_addln(text_buff, ftag);
     buff_add(text_buff, stmt->break_tag);
     buff_add(text_buff, ":\n");
