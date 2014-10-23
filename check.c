@@ -1313,7 +1313,7 @@ static inline list *syntax_argument_expression_list(FILE *stream, namespace_t *n
 {
     char *token;
     list *retptr = list_node();
-    int error;
+    int error = 0;
     while (1) {
         list *cur = syntax_assignment(stream, namespace);
         if (!cur)
@@ -1540,9 +1540,10 @@ list *syntax_postfix(FILE *stream, namespace_t *namespace)
                     error(stream, 0);
                 }
                 end_stack_pop();
-                longjmp(env, 1);
+                goto t5;
                 t4: if (!setjmp(env)) goto t3;
                 arguments = 0;
+                t5: ;
             }
             if (llist && arguments) {
                 if (type(llist->content) == function_t || (type(llist->content) == pointer_t &&

@@ -650,10 +650,11 @@ list *parse_specifier(FILE *stream, namespace_t *namespace)
     return retptr;
 }
 
-parameter_storage *parameter_storage_init()
+parameter_storage *parameter_storage_init(int address)
 {
     parameter_storage *retptr = (parameter_storage *)malloc(sizeof(parameter_storage));
     retptr->type = parameter_storage_t;
+    retptr->address = address;
     return retptr;
 }
 
@@ -1090,6 +1091,18 @@ void struct_def(declaration *node) {
             declaration *node = declaration_dup(ptr->content);
             struct size *thesize = ((declaration *)ptr->content)->storage;
             node->storage = auto_storage_sub_size_nip(base, thesize);
+            if (type(node->type_list->content) == struct_specifier_t)
+                struct_def(node);
+            list_append(new_declaration_list, node);
+        }
+    }
+    else if (type(storage) == parameter_storage_t) {
+        parameter_storage *base = storage;
+        int address = base->address;
+        for (ptr = specifier->declaration_list->next; ptr; ptr = ptr->next) {
+            declaration *node = declaration_dup(ptr->content);
+            struct size *thesize = ((declaration *)ptr->content)->storage;
+            node->storage = parameter_storage_init(address+thesize->ival);
             if (type(node->type_list->content) == struct_specifier_t)
                 struct_def(node);
             list_append(new_declaration_list, node);
@@ -2151,11 +2164,12 @@ void *parse_external_declaration(FILE *stream, namespace_t *namespace)
             int psize = 0;
             for (ptr = f->parameter_list->next; ptr; ptr = ptr->next) {
                 declaration *d = ptr->content;
-                parameter_storage *storage = parameter_storage_init();
-                storage->address = psize;
+                parameter_storage *storage = parameter_storage_init(psize);
+                d->storage = storage;
                 struct size *thesize = size(d->type_list);
                 psize += thesize->ival;
-                d->storage = storage;
+                if (type(d->type_list->content) == struct_specifier_t)
+                    struct_def(d);
             }
             unscan(token ,stream);
             func_->tag = !strcmp(id, "main") ? strdup("_start") : get_tag();
