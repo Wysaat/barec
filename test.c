@@ -187,19 +187,35 @@
 //     return g;
 // }
 
+// int main()
+// {
+//     float x = 827.2432;
+//     int y = x;
+//     float z = y;
+//     int w = z;
+//     return w;
+// }
+
+// float f(int x) {
+//     return x;
+// }
+
+// int main()
+// {
+//     int x = 424;
+//     float y = f(x);
+//     return y;
+// }
+
 // struct matrix {
 //     int content[4][4];
 //     float fcontent[3];
 // };
 
 // float matrix_sum(struct matrix matrix) {
-//     int i, j, res = 0;
-//     for (i = 0; i < 4; i++)
-//         for (j = 0; j < 4; j++)
-//             res += matrix.content[i][j];
-//     res *= matrix.fcontent[0];
-//     res /= matrix.fcontent[1];
-//     res += matrix.fcontent[2];
+//     int i, j;
+//     int res;
+//     res = matrix.fcontent[0];
 //     return res;
 // }
 
@@ -219,6 +235,152 @@
 //     return g;
 // }
 
+// struct matrix {
+//     int content[4][4];
+//     float fcontent[3];
+// };
+
+// float matrix_sum(struct matrix matrix) {
+//     int i, j, res = 0;
+//     for (i = 0; i < 4; i++)
+//         for (j = 0; j < 4; j++)
+//             res += matrix.content[i][j];
+//     res = matrix.fcontent[0];
+//     return res;
+// }
+
+// int main()
+// {
+//     struct matrix m = {
+//         {
+//             { 42, 97, 1421, 999 },
+//             { 7, 24, 11, 7243 },
+//             { 5, 66, 972, 2342 },
+//             { 143, 32, 432, 222 },
+//         },
+//         { 424.2423, 77432.2423, -924141.772 },
+//     };
+//     int x = 42;
+//     double g = matrix_sum(m) + x;
+//     return g;
+// }
+
+// int main()
+// {
+//     int res = 4242;
+//     res *= 424.2423;
+//     return res;
+// }
+
+// int main()
+// {
+//     int res = 4242;
+//     res *= 424.2423;
+//     res /= 77432.2423;
+//     res += 924141.772;
+//     return res;
+// }
+
+// struct matrix {
+//     int content[4][4];
+//     float fcontent[3];
+// };
+
+// int main()
+// {
+//     struct matrix m = {
+//         {
+//             { 42, 97, 1421, 999 },
+//             { 7, 24, 11, 7243 },
+//             { 5, 66, 972, 2342 },
+//             { 143, 32, 432, 222 },
+//         },
+//         { 424.2423, 77432.2423, 924141.772 },
+//     };
+//     int x = 42;
+//     int i, j, res = 0;
+//     for (i = 0; i < 4; i++)
+//         for (j = 0; j < 4; j++)
+//             res += m.content[i][j];
+//     res *= 424.2423;
+//     res /= 77432.2423;
+//     res += 924141.772;
+//     double g = (float)res + x;
+//     return g;
+// }
+
+// int main()
+// {
+//     int x = 42;
+//     int a = 5964040;
+//     a /= 77432.2423;
+//     double d = (float)a + 42;
+//     return d;
+// }
+
+// struct matrix {
+//     int content[4][4];
+//     float fcontent[3];
+// };
+
+// float matrix_sum(struct matrix matrix) {
+//     int i, j, res = 0;
+//     for (i = 0; i < 4; i++)
+//         for (j = 0; j < 4; j++)
+//             res += matrix.content[i][j];
+//     res *= 424.2423;
+//     res /= 77432.2423;
+//     return res;
+// }
+
+// int main()
+// {
+//     struct matrix m = {
+//         {
+//             { 42, 97, 1421, 999 },
+//             { 7, 24, 11, 7243 },
+//             { 5, 66, 972, 2342 },
+//             { 143, 32, 432, 222 },
+//         },
+//         { 424.2423, 77432.2423, 924141.772 },
+//     };
+//     int x = 42;
+//     double g = matrix_sum(m) + 42;
+//     return g;
+// }
+
+// struct matrix {
+//     int content[4][4];
+//     float fcontent[3];
+// };
+
+// float matrix_sum(struct matrix matrix) {
+//     int i, j, res = 0;
+//     for (i = 0; i < 4; i++)
+//         for (j = 0; j < 4; j++)
+//             res += matrix.content[i][j];
+//     res *= 424.2423;
+//     res /= 77432.2423;
+//     res += 924141.772;
+//     return res;
+// }
+
+// int main()
+// {
+//     struct matrix m = {
+//         {
+//             { 42, 97, 1421, 999 },
+//             { 7, 24, 11, 7243 },
+//             { 5, 66, 972, 2342 },
+//             { 143, 32, 432, 222 },
+//         },
+//         { 424.2423, 77432.2423, 924141.772 },
+//     };
+//     int x = 42;
+//     double g = matrix_sum(m) + x;
+//     return g;
+// }
+
 struct matrix {
     int content[4][4];
     float fcontent[3];
@@ -229,7 +391,9 @@ float matrix_sum(struct matrix matrix) {
     for (i = 0; i < 4; i++)
         for (j = 0; j < 4; j++)
             res += matrix.content[i][j];
-    res = matrix.fcontent[0];
+    res *= matrix.fcontent[0];
+    res /= matrix.fcontent[1];
+    res += matrix.fcontent[2];
     return res;
 }
 

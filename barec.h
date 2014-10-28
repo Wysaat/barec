@@ -81,6 +81,7 @@ enum types {
     constant_t,
     init_info_type,
     declarator_info_type,
+    funcall_struct_ref_type,
 };
 
 enum atypes {
@@ -99,6 +100,14 @@ enum atypes {
     long_double_t = 12,   // 12 bytes
 };
 
+typedef struct funcall funcall;
+
+typedef struct {
+    int type;
+    funcall *primary;
+    char *id;
+} funcall_struct_ref_t;
+
 typedef struct void_specifier {
     int type;
 } void_specifier;
@@ -113,6 +122,7 @@ typedef struct namespace {
     list *typedefs;
     list *enums;
     int is_func_ns;
+    list *return_type_list;
 } namespace_t;
 
 typedef struct aconstant {
@@ -468,7 +478,7 @@ void *parse_expression(FILE *stream, namespace_t *namespace);
 void *pares_expression_stmt(FILE *stream, namespace_t *namespace);
 void *parse_statement(FILE *stream, struct namespace *namespace);
 void *parse_declaration_or_statement(FILE *stream, struct namespace *namespace);
-void *parse_compound_stmt(FILE *stream, struct namespace *namespace, list *parameter_list);
+void *parse_compound_stmt(FILE *stream, struct namespace *namespace, list *parameter_list, list *return_type_list);
 void *parse_if_stmt(FILE *stream, namespace_t *namespace);
 void *parse_switch_stmt(FILE *stream, namespace_t *namespace);
 void *parse_case_stmt(FILE *stream, namespace_t *namespace);
@@ -507,6 +517,7 @@ void errorh();
 func *func_init(char *id, char *tag, list *type_list);
 inline struct size *size_cpy(struct size *ptr);
 func *find_func(namespace_t *namespace, char *id);
+void size_add(struct size *left, struct size *right);
 
 /*
  * parse.c
@@ -528,7 +539,7 @@ parameter *parameter_init(void *storage, list *type_list);
 arithmetic *ARITHMETIC(char *value, int atype);
 string *STRING(int address, char *value);
 void *ARRAY_REF(void *primary, void *expr);
-declaration *STRUCT_REF(void *primary, char *id);
+void *STRUCT_REF(void *primary, char *id);
 posinc *POSINC(void *primary, int inc);
 funcall *FUNCALL(void *primary, list *argument_expression_list);
 preinc *PREINC(void *expr, int inc);
@@ -657,6 +668,6 @@ void error_message_np(int line, int column, char *message);
 void errorh_np(int line, int column);
 int type_list_eq(list *left, list *right);
 char *type_list_to_str(list *type_list);
-static inline list *type_list_copy(list *type_list);
+inline list *type_list_copy(list *type_list);
 
 #endif /* SCAN_H */

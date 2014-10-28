@@ -1417,7 +1417,7 @@ static list *epost_suref(char *token, list *llist, int line, int column)
     return llist;
 }
 
-static inline list *type_list_copy(list *type_list)
+inline list *type_list_copy(list *type_list)
 {
     list *retptr = list_init(type_list->content);
     list *ptr, *ptr2;

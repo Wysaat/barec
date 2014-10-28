@@ -201,13 +201,26 @@ auto_storage *auto_storage_sub_size_nip(auto_storage *left, struct size *right)
     return auto_storage_init(constant, ival, vval);
 }
 
-declaration *STRUCT_REF(void *primary, char *id) {
-    struct_specifier *specifier = get_type_list(primary)->content;
+funcall_struct_ref_t *funcall_struct_ref_init(funcall *primary, char *id) {
+    funcall_struct_ref_t *retptr = malloc(sizeof(funcall_struct_ref_t));
+    retptr->type = funcall_struct_ref_type;
+    retptr->primary = primary;
+    retptr->id = id;
+    return retptr;
+}
+
+void *STRUCT_REF(void *primary, char *id) {
+    struct_specifier *specifier = get_type_list(primary)->next->content;
+    struct size *offset = size_init(1, 0, 0);
     list *ptr;
     for (ptr = specifier->declaration_list->next; ptr; ptr = ptr->next) {
         declaration *node = ptr->content;
-        if (!strcmp(node->id, id))
-            return node;
+        if (!strcmp(node->id, id)) {
+            list *type_list = list_init(pointer_init());
+            list_extend(type_list, node->type_list);
+            return INDIRECTION(CAST(type_list, BINARY(add, primary, size_to_expr(offset))));
+        }
+        size_add(offset, size(node->type_list));
     }
 }
 
@@ -259,7 +272,7 @@ void *INDIRECTION(void *expr) {
     indirection *retptr = (indirection *)malloc(sizeof(indirection));
     retptr->type = indirection_t;
     retptr->expr = expr;
-    retptr->type_list = get_type_list(expr)->next;
+    retptr->type_list = type_list->next;
     return retptr;
 }
 

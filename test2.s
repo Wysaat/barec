@@ -6,6 +6,10 @@ dq 424.242300
 t12:
 dq 77432.242300
 t13:
+dq 424.242300
+t14:
+dq 77432.242300
+t15:
 dq 924141.772000
 section .bss
 t1:
@@ -165,30 +169,17 @@ sub ebx, eax
 mov eax, ebx
 mov eax, [eax]
 cdq
-ffree st0
 push edx
 push eax
 fild qword [esp]
 pop eax
 pop edx
-sub esp, 4
-fst dword [esp]
-mov eax, 0
-push eax
-mov eax, 4
-pop ebx
-imul ebx
-push eax
-mov eax, 64
-push eax
-lea eax, [ebp+8]
-pop ebx
-add eax, ebx
-pop ebx
-add eax, ebx
+sub esp, 8
+fst qword [esp]
 ffree st0
-fld dword [eax]
-fmul dword [esp]
+fld qword [t11]
+fmul qword [esp]
+pop eax
 pop eax
 sub esp, 8
 fistp qword [esp]
@@ -201,78 +192,23 @@ mov ebx, ebp
 sub ebx, eax
 mov eax, ebx
 push eax
-mov eax, 1
-push eax
-mov eax, 4
-pop ebx
-imul ebx
-push eax
-mov eax, 64
-push eax
-lea eax, [ebp+8]
-pop ebx
-add eax, ebx
-pop ebx
-add eax, ebx
 ffree st0
-fld dword [eax]
-sub esp, 4
-fst dword [esp]
-mov eax, 12
-mov ebx, ebp
-sub ebx, eax
-mov eax, ebx
-mov eax, [eax]
-cdq
-ffree st0
-push edx
-push eax
-fild qword [esp]
-pop eax
-pop edx
-fdiv dword [esp]
-pop eax
+fld qword [t12]
 sub esp, 8
-fistp qword [esp]
-pop eax
-pop edx
-pop ebx
-mov [ebx], eax
-mov eax, 12
-mov ebx, ebp
-sub ebx, eax
-mov eax, ebx
-push eax
-mov eax, 2
-push eax
-mov eax, 4
-pop ebx
-imul ebx
-push eax
-mov eax, 64
-push eax
-lea eax, [ebp+8]
-pop ebx
-add eax, ebx
-pop ebx
-add eax, ebx
-ffree st0
-fld dword [eax]
-sub esp, 4
-fst dword [esp]
+fst qword [esp]
 mov eax, 12
 mov ebx, ebp
 sub ebx, eax
 mov eax, ebx
 mov eax, [eax]
 cdq
-ffree st0
 push edx
 push eax
 fild qword [esp]
 pop eax
 pop edx
-fadd dword [esp]
+fdiv qword [esp]
+pop eax
 pop eax
 sub esp, 8
 fistp qword [esp]
@@ -286,7 +222,6 @@ sub ebx, eax
 mov eax, ebx
 mov eax, [eax]
 cdq
-ffree st0
 push edx
 push eax
 fild qword [esp]
@@ -700,7 +635,7 @@ pop ebx
 add eax, ebx
 push eax
 ffree st0
-fld qword [t11]
+fld qword [t13]
 pop ebx
 fst dword [ebx]
 mov eax, 1
@@ -717,7 +652,7 @@ pop ebx
 add eax, ebx
 push eax
 ffree st0
-fld qword [t12]
+fld qword [t14]
 pop ebx
 fst dword [ebx]
 mov eax, 2
@@ -734,8 +669,7 @@ pop ebx
 add eax, ebx
 push eax
 ffree st0
-fld qword [t13]
-fchs
+fld qword [t15]
 pop ebx
 fst dword [ebx]
 mov eax, 80
@@ -751,20 +685,6 @@ mov ebx, ebp
 sub ebx, eax
 mov eax, ebx
 push eax
-mov eax, 80
-mov ebx, ebp
-sub ebx, eax
-mov eax, ebx
-mov eax, [eax]
-cdq
-ffree st0
-push edx
-push eax
-fild qword [esp]
-pop eax
-pop edx
-sub esp, 4
-fst dword [esp]
 mov eax, 2
 push eax
 mov eax, 4
@@ -1168,8 +1088,6 @@ push eax
 mov eax, t2
 call eax
 add esp, 76
-fadd dword [esp]
-pop eax
 pop ebx
 fst qword [ebx]
 mov eax, 88

@@ -49,6 +49,9 @@ void declaration_gencode(declaration *expr)
         case enum_type:
             buff_add(text_buff, "mov eax, [eax]\n");
             break;
+        case struct_specifier_t: case union_specifier_t:
+            // do nothing
+            break;
     }
 }
 
@@ -154,13 +157,13 @@ void posinc_gencode(posinc *expr)
                             "inc qword [eax]\n"
                             "pop eax\n"
                             "pop edx\n"
-                            );
+                        );
                     else
                         buff_add(text_buff,
                             "dec qword [eax]\n"
                             "pop eax\n"
                             "pop edx\n"
-                            );
+                        );
                     break;
                 case unsigned_long_t: case long_t: case unsigned_int_t: case int_t:
                     buff_add(text_buff, "push eax\n");
@@ -169,12 +172,12 @@ void posinc_gencode(posinc *expr)
                         buff_add(text_buff,
                             "inc dword [eax]\n"
                             "pop eax\n"
-                            );
+                        );
                     else
                         buff_add(text_buff,
                             "dec dword [eax]\n"
                             "pop eax\n"
-                            );
+                        );
                     break;
                 case unsigned_short_t: case short_t:
                     buff_add(text_buff, "push eax\n");
@@ -183,12 +186,12 @@ void posinc_gencode(posinc *expr)
                         buff_add(text_buff,
                             "inc word [eax]\n"
                             "pop eax\n"
-                            );
+                        );
                     else
                         buff_add(text_buff,
                             "dec word [eax]\n"
                             "pop eax\n"
-                            );
+                        );
                     break;
                 case unsigned_char_t: case char_t:
                     buff_add(text_buff, "push eax\n");
@@ -197,46 +200,50 @@ void posinc_gencode(posinc *expr)
                         buff_add(text_buff,
                             "inc word [eax]\n"
                             "pop eax\n"
-                            );
+                        );
                     else
                         buff_add(text_buff,
                             "dec word [eax]\n"
                             "pop eax\n"
-                            );
+                        );
                     break;
                 case float_t:
                     gencode(ADDR(expr->primary));
                     if (expr->inc)
                         buff_add(text_buff,
+                            "ffree st0\n"
                             "fld dword [eax]\n"
                             "fld1\n"
                             "faddp\n"
                             "fstp dword [eax]\n"
-                            );
+                        );
                     else
                         buff_add(text_buff,
+                            "ffree st0\n"
                             "fld dword [eax]\n"
                             "fld1\n"
                             "fsubp\n"
                             "fstp dword [eax]\n"
-                            );
+                        );
                     break;
                 case double_t:
                     gencode(ADDR(expr->primary));
                     if (expr->inc)
                         buff_add(text_buff,
+                            "ffree st0\n"
                             "fld qword [eax]\n"
                             "fld1\n"
                             "faddp\n"
                             "fstp qword [eax]\n"
-                            );
+                        );
                     else
                         buff_add(text_buff,
+                            "ffree st0\n"
                             "fld qword [eax]\n"
                             "fld1\n"
                             "fsubp\n"
                             "fstp qword [eax]\n"
-                            );
+                        );
                     break;
             }
             break;
@@ -581,6 +588,20 @@ void unary_gencode(unary *expr)
                 case int_t: case unsigned_int_t:
                     buff_add(text_buff, "neg eax\n");
                     break;
+                case long_t: case unsigned_long_t:
+                    buff_add(text_buff, "neg eax\n");
+                    break;
+                case long_long_t: case unsigned_long_long_t:
+                    buff_add(text_buff,
+                        "not eax\n"
+                        "not ebx\n"
+                        "add eax, 1\n"
+                        "adc ebx, 1\n"
+                    );
+                    break;
+                case float_t: case double_t:
+                    buff_add(text_buff, "fchs\n");
+                    break;
             }
         }
     }
@@ -648,15 +669,35 @@ static inline void cast_uint(int lt) {
 
 static inline void cast_long(int lt) {
     switch (lt) {
-        case float_t: case double_t: buff_add(text_buff, "push edx\npush eax\nfild qword [esp]\npop eax\npop edx\n"); return;
-        default: return;
+        case float_t: case double_t:
+            buff_add(text_buff,
+                "ffree st0\n"
+                "push edx\n"
+                "push eax\n"
+                "fild qword [esp]\n"
+                "pop eax\n"
+                "pop edx\n"
+            );
+            return;
+        default:
+            return;
     }
 }
 
 static inline void cast_ulong(int lt) {
     switch (lt) {
-        case float_t: case double_t: buff_add(text_buff, "push edx\npush eax\nfild qword [esp]\npop eax\npop edx\n"); return;
-        default: return;
+        case float_t: case double_t:
+            buff_add(text_buff,
+                "ffree st0\n"
+                "push edx\n"
+                "push eax\n"
+                "fild qword [esp]\n"
+                "pop eax\n"
+                "pop edx\n"
+            );
+            return;
+        default:
+            return;
     }
 }
 
