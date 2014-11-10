@@ -82,6 +82,7 @@ enum types {
     init_info_type,
     declarator_info_type,
     funcall_struct_ref_type,
+    static_addr_type,
 };
 
 enum atypes {
@@ -99,6 +100,12 @@ enum atypes {
     double_t = 11,         // 8 bytes
     long_double_t = 12,   // 12 bytes
 };
+
+typedef struct static_addr {
+    int type;
+    int value;
+    int initialized;
+} static_addr_t;
 
 typedef struct funcall funcall;
 
@@ -663,7 +670,7 @@ void syntax_break_stmt(FILE *stream, namespace_t *namespace);
 void syntax_return_stmt(FILE *stream, namespace_t *namespace);
 void syntax_external_declaration(FILE *stream, namespace_t *namespace);
 void syntax_translation_unit(FILE *stream);
-void syntax_a_conditional(FILE *stream);
+list *syntax_a_conditional(FILE *stream);
 void error_message_np(int line, int column, char *message);
 void errorh_np(int line, int column);
 int type_list_eq(list *left, list *right);

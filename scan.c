@@ -414,7 +414,7 @@ struct namespace *namespace_init(namespace_t *outer)
     return retptr;
 }
 
-/* in the returned list, first is the storage specifier, the second is the type specifier */
+/* in the returned list, the first is the storage specifier, the second is the type specifier */
 /*
  * flag == 0 : internal
  * flag == 1 : external
@@ -958,8 +958,9 @@ static void *initializing(void *node, void *initializer)
             if (initializer) {
                 list *ptr2 = ((list *)initializer)->next;
                 for (ptr = specifier->declaration_list->next; ptr; ptr = ptr->next) {
-                    declaration *node = ptr->content;
-                    void *s = node->type_list->content;
+                    declaration *no = ptr->content;
+                    char *id = no->id;
+                    void *s = no->type_list->content;
                     void *inival;
                     int subsize = -1;
                     if (type(s) == array_t) {
@@ -999,14 +1000,15 @@ static void *initializing(void *node, void *initializer)
                             ptr2 = ptr2->next;
                         }
                     }
-                    void *ap = initializing(node, inival);
+                    void *ap = initializing(STRUCT_REF(node, id), inival);
                     if (ap)
                         list_append(stmts, ap);
                 }
             }
             else {
                 for (ptr = specifier->declaration_list->next; ptr; ptr = ptr->next) {
-                    void *ap = initializing(node, 0);
+                    char *id = ((declaration *)ptr->content)->id;
+                    void *ap = initializing(STRUCT_REF(node, id), 0);
                     if (ap)
                         list_append(stmts, ap);
                 }
@@ -1016,7 +1018,7 @@ static void *initializing(void *node, void *initializer)
     }
 }
 
-/* add the second parameter to the fist */
+/* add the second parameter to the first */
 void size_add(struct size *left, struct size *right)
 {
     if (left->constant) {
@@ -1064,58 +1066,6 @@ typedef_t *typedef_init(char *id, list *type_list)
     return retptr;
 }
 
-inline declaration *declaration_dup(declaration *node) {
-    return declaration_init(node->id, 0, node->type_list);
-}
-
-void struct_def(declaration *node) {
-    list *ptr;
-    void *storage = node->storage;
-    list *new_declaration_list = list_node();
-    struct_specifier *specifier = node->type_list->content;
-    if (type(storage) == static_storage_t) {
-        static_storage *base = storage;
-        int ival = base->ival;
-        int initialized = base->initialized;
-        for (ptr = specifier->declaration_list->next; ptr; ptr = ptr->next) {
-            declaration *node = declaration_dup(ptr->content);
-            struct size *thesize = ((declaration *)ptr->content)->storage;
-            node->storage = static_storage_init(ival+thesize->ival, initialized);
-            if (type(node->type_list->content) == struct_specifier_t)
-                struct_def(node);
-            list_append(new_declaration_list, node);
-        }
-    }
-    else if (type(storage) == auto_storage_t) {
-        auto_storage *base = storage;
-        for (ptr = specifier->declaration_list->next; ptr; ptr = ptr->next) {
-            declaration *node = declaration_dup(ptr->content);
-            struct size *thesize = ((declaration *)ptr->content)->storage;
-            node->storage = auto_storage_sub_size_nip(base, thesize);
-            if (type(node->type_list->content) == struct_specifier_t)
-                struct_def(node);
-            list_append(new_declaration_list, node);
-        }
-    }
-    else if (type(storage) == parameter_storage_t) {
-        parameter_storage *base = storage;
-        int address = base->address;
-        for (ptr = specifier->declaration_list->next; ptr; ptr = ptr->next) {
-            declaration *node = declaration_dup(ptr->content);
-            struct size *thesize = ((declaration *)ptr->content)->storage;
-            node->storage = parameter_storage_init(address+thesize->ival);
-            if (type(node->type_list->content) == struct_specifier_t)
-                struct_def(node);
-            list_append(new_declaration_list, node);
-        }
-    }
-    node->type_list->content = struct_specifier_init(specifier->id, new_declaration_list);
-}
-
-inline struct size *size_cpy(struct size *ptr) {
-    return size_init(ptr->constant, ptr->ival, ptr->vval);
-}
-
 void *parse_declaration(FILE *stream, namespace_t *namespace, int in_struct)
 {
     list *specifiers = parse_specifier(stream, namespace);
@@ -1158,13 +1108,7 @@ void *parse_declaration(FILE *stream, namespace_t *namespace, int in_struct)
         else
             list_append(namespace->typedefs, typedef_init(id, type_list));
         token = scan(stream);
-        if (in_struct) {
-            node->storage = size_cpy(namespace->auto_size);
-            size_add(namespace->auto_size, size(type_list));
-            if (!strcmp(token, ";"))
-                return 0;
-        }
-        else {
+        if (!in_struct) {
             void *initializer = 0;
             int got_eq = 0;
             if (!strcmp(token, "=")) {
@@ -1181,8 +1125,6 @@ void *parse_declaration(FILE *stream, namespace_t *namespace, int in_struct)
                 size_add(namespace->auto_size, size(type_list));
                 node->storage = auto_storage_init(namespace->auto_size->constant, namespace->auto_size->ival,
                                                   namespace->auto_size->vval);
-                if (type(type_list->content) == struct_specifier_t)
-                    struct_def(node);
             }
             else if (type(storage) == static_storage_t) {
                 if (initializer) {
@@ -1193,8 +1135,6 @@ void *parse_declaration(FILE *stream, namespace_t *namespace, int in_struct)
                     node->storage = static_storage_init(bss_size, 0);
                     bss_size += size(type_list)->ival;
                 }
-                if (type(type_list->content) == struct_specifier_t)
-                    struct_def(node);
             }
             void *stmt = 0;
             int initialized = initializer ? 1 : 0;
@@ -2175,8 +2115,6 @@ void *parse_external_declaration(FILE *stream, namespace_t *namespace)
                 d->storage = storage;
                 struct size *thesize = size(d->type_list);
                 psize += thesize->ival;
-                if (type(d->type_list->content) == struct_specifier_t)
-                    struct_def(d);
             }
             unscan(token ,stream);
             func_->tag = !strcmp(id, "main") ? strdup("_start") : get_tag();
@@ -2210,9 +2148,6 @@ void *parse_external_declaration(FILE *stream, namespace_t *namespace)
                     node->storage = static_storage_init(bss_size, 0);
                     bss_size += size(type_list)->ival;
                 }
-                if (type(type_list->content) == struct_specifier_t)
-                    struct_def(node);
-
                 int initialized = initializer ? 1 : 0;
                 void *stmt = initializing(node, initializer);
                 compound_stmt *body;
@@ -2260,7 +2195,7 @@ translation_unit_t *parse_translation_unit(FILE *stream)
     for (ptr = namespace->declaration_list->next; ptr; ptr = ptr->next) {
         declaration *node = ptr->content;
         static_storage *storage = node->storage;
-        if (storage->initialized = -1) {
+        if (storage->initialized == -1) {
             storage = static_storage_init(bss_size, 0);
             bss_size += size(node->type_list)->ival;
             list *stmts = list_node();

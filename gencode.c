@@ -1573,12 +1573,20 @@ void function_definition_gencode(function_definition_t *function_definition)
         );
 }
 
+void static_addr_gencode(static_addr_t *expr) {
+    if (expr->initialized)
+        buff_add(text_buff, data_addr(expr->value));
+    else
+        buff_add(text_buff, bss_addr(expr->value));
+}
+
 void gencode(void *expr)
 {
     switch (type(expr)) {
         case declaration_t: declaration_gencode(expr); break;
         case func_t: func_gencode(expr); break;
         case arithmetic_t: arithmetic_gencode(expr); break;
+        case static_addr_type: static_addr_gencode(expr); break;
         case string_t: string_gencode(expr); break;
         case posinc_t: posinc_gencode(expr); break;
         case union_ref_type: union_ref_gencode(expr); break;

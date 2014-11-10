@@ -381,34 +381,90 @@
 //     return g;
 // }
 
-struct matrix {
-    int content[4][4];
-    float fcontent[3];
+// struct matrix {
+//     int content[4][4];
+//     float fcontent[3];
+// };
+
+// float matrix_sum(struct matrix matrix) {
+//     int i, j, res = 0;
+//     for (i = 0; i < 4; i++)
+//         for (j = 0; j < 4; j++)
+//             res += matrix.content[i][j];
+//     res *= matrix.fcontent[0];
+//     res /= matrix.fcontent[1];
+//     res += matrix.fcontent[2];
+//     return res;
+// }
+
+// int main()
+// {
+//     struct matrix m = {
+//         {
+//             { 42, 97, 1421, 999 },
+//             { 7, 24, 11, 7243 },
+//             { 5, 66, 972, 2342 },
+//             { 143, 32, 432, 222 },
+//         },
+//         { 424.2423, 77432.2423, -924141.772 },
+//     };
+//     int x = 42;
+//     double g = matrix_sum(m) + x;
+//     return g;
+// }
+
+struct test {
+    int a;
+    int b;
 };
 
-float matrix_sum(struct matrix matrix) {
-    int i, j, res = 0;
-    for (i = 0; i < 4; i++)
-        for (j = 0; j < 4; j++)
-            res += matrix.content[i][j];
-    res *= matrix.fcontent[0];
-    res /= matrix.fcontent[1];
-    res += matrix.fcontent[2];
-    return res;
-}
+struct test t = { 3, 4 };
+float *a = 3 * m;
+// float c = 3.333 + a;
+
+
+// enum x {
+//     s = (int)c,
+//     tt = 4242.22,
+// };
 
 int main()
 {
-    struct matrix m = {
-        {
-            { 42, 97, 1421, 999 },
-            { 7, 24, 11, 7243 },
-            { 5, 66, 972, 2342 },
-            { 143, 32, 432, 222 },
-        },
-        { 424.2423, 77432.2423, -924141.772 },
-    };
-    int x = 42;
-    double g = matrix_sum(m) + x;
-    return g;
+    return 3;
 }
+
+// typedef int DType;
+
+// DType realx[20] = {
+//     8284, 74404, 44077, 66418, 33098, 53491, 35370, 79928, 53099, 52281, 75523,
+//     92977, 57784, 60996, 78689, 49412, 45636, 91283, 7067, 39659
+// };
+
+// int *x = realx; /* allow x to shift for heaps */
+// int n = 20;
+
+// void swap(int i, int j) {
+//     DType t = x[i];
+//     x[i] = x[j];
+//     x[j] = t;
+// }
+
+// int intcomp(int *x, int *y) {
+//     return *x - *y;
+// }
+
+// /* INSERTION SORTS */
+
+// /* Simplest insertion sort */
+// void isort1() {
+//     int i, j;
+//     for (i = 1; i < n; i++)
+//         for (j = i; j > 0 && x[j-1] > x[j]; j--)
+//             swap(j-1, j);
+// }
+
+// int main()
+// {
+//     isort1();
+//     return 0;
+// }
