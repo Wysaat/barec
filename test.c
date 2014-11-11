@@ -419,19 +419,8 @@ struct test {
 };
 
 struct test t = { 3, 4 };
-float *a = 3 * m;
-// float c = 3.333 + a;
-
-
-// enum x {
-//     s = (int)c,
-//     tt = 4242.22,
-// };
-
-int main()
-{
-    return 3;
-}
+int b;
+// int a = &b + 4;
 
 // typedef int DType;
 

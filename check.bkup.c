@@ -83,59 +83,72 @@ void error(FILE *stream, char *message)
     }
 }
 
-void syntax_aconstant(FILE *stream)
+list *alconv(list *llist, list *rlist) {
+    int l = ((arithmetic_specifier *)llist->content)->atype;
+    int r = ((arithmetic_specifier *)rlist->content)->atype;
+    if (l == float_t)
+        return llist;
+    return rlist;
+}
+
+list *syntax_aconstant(FILE *stream)
 {
     char *token = scan(stream);
     if (!strcmp(token, "(")) {
-        syntax_a_conditional(stream);
+        list *retptr = syntax_a_conditional(stream);
         token = scan(stream);
+        return retptr;
     }
-    else if (!is_int(token) && !is_float(token)) {
+    else if (is_int(token))
+        return list_init(arithmetic_specifier_init(int_t));
+    else if (is_float(token))
+        return list_init(arithmetic_specifier_init(float_t));
+    else {
         unscan(token, stream);
         error(stream, "expression is not an integer constant expression");
     }
 }
 
-void syntax_a_unary(FILE *stream)
+list *syntax_a_unary(FILE *stream)
 {
     char *token = scan(stream);
     if (!strcmp(token, "+") || !strcmp(token, "-") || !strcmp(token, "!") || !strcmp(token, "~"))
-        syntax_aconstant(stream);
+        return syntax_aconstant(stream);
     else {
         unscan(token, stream);
-        syntax_aconstant(stream);
+        return syntax_aconstant(stream);
     }
 }
 
-void syntax_a_m_expr(FILE *stream)
+list *syntax_a_m_expr(FILE *stream)
 {
-    syntax_a_unary(stream);
+    list *llist = syntax_a_unary(stream);
     while (1) {
         char *token = scan(stream);
         if (!strcmp(token, "*") || !strcmp(token, "/") || !strcmp(token, "%"))
-            syntax_a_unary(stream);
+            llist = alconv(llist, syntax_a_unary(stream));
         else {
             unscan(token, stream);
-            return;
+            return llist;
         }
     }
 }
 
-void syntax_a_a_expr(FILE *stream)
+list *syntax_a_a_expr(FILE *stream)
 {
-    syntax_a_m_expr(stream);
+    list *llist = syntax_a_m_expr(stream);
     while (1) {
         char *token = scan(stream);
         if (!strcmp(token, "+") || !strcmp(token, "-"))
-            syntax_a_m_expr(stream);
+            llist = alconv(llist, syntax_a_m_expr(stream));
         else {
             unscan(token, stream);
-            return;
+            return llist;
         }
     }
 }
 
-void syntax_a_shift(FILE *stream)
+list *syntax_a_shift(FILE *stream)
 {
     syntax_a_a_expr(stream);
     while (1) {
@@ -144,12 +157,12 @@ void syntax_a_shift(FILE *stream)
             syntax_a_a_expr(stream);
         else {
             unscan(token, stream);
-            return;
+            return list_init(arithmetic_specifier_init(int_t));
         }
     }
 }
 
-void syntax_a_relational(FILE *stream)
+list *syntax_a_relational(FILE *stream)
 {
     syntax_a_shift(stream);
     while (1) {
@@ -158,12 +171,12 @@ void syntax_a_relational(FILE *stream)
             syntax_a_shift(stream);
         else {
             unscan(token, stream);
-            return;
+            return list_init(arithmetic_specifier_init(int_t));
         }
     }
 }
 
-void syntax_a_equality(FILE *stream)
+list *syntax_a_equality(FILE *stream)
 {
     syntax_a_relational(stream);
     while (1) {
@@ -172,12 +185,12 @@ void syntax_a_equality(FILE *stream)
             syntax_a_relational(stream);
         else {
             unscan(token, stream);
-            return;
+            return list_init(arithmetic_specifier_init(int_t));
         }
     }
 }
 
-void syntax_a_and(FILE *stream)
+list *syntax_a_and(FILE *stream)
 {
     syntax_a_equality(stream);
     while (1) {
@@ -186,12 +199,12 @@ void syntax_a_and(FILE *stream)
             syntax_a_equality(stream);
         else {
             unscan(token, stream);
-            return;
+            return list_init(arithmetic_specifier_init(int_t));
         }
     }
 }
 
-void syntax_a_xor(FILE *stream)
+list *syntax_a_xor(FILE *stream)
 {
     syntax_a_and(stream);
     while (1) {
@@ -200,12 +213,12 @@ void syntax_a_xor(FILE *stream)
             syntax_a_and(stream);
         else {
             unscan(token, stream);
-            return;
+            return list_init(arithmetic_specifier_init(int_t));
         }
     }
 }
 
-void syntax_a_or(FILE *stream)
+list *syntax_a_or(FILE *stream)
 {
     syntax_a_xor(stream);
     while (1) {
@@ -214,12 +227,12 @@ void syntax_a_or(FILE *stream)
             syntax_a_xor(stream);
         else {
             unscan(token, stream);
-            return;
+            return list_init(arithmetic_specifier_init(int_t));
         }
     }
 }
 
-void syntax_a_logical_and(FILE *stream)
+list *syntax_a_logical_and(FILE *stream)
 {
     syntax_a_or(stream);
     while (1) {
@@ -228,12 +241,12 @@ void syntax_a_logical_and(FILE *stream)
             syntax_a_or(stream);
         else {
             unscan(token, stream);
-            return;
+            return list_init(arithmetic_specifier_init(int_t));
         }
     }
 }
 
-void syntax_a_logical_or(FILE *stream)
+list *syntax_a_logical_or(FILE *stream)
 {
     syntax_a_logical_and(stream);
     while (1) {
@@ -242,23 +255,24 @@ void syntax_a_logical_or(FILE *stream)
             syntax_a_logical_and(stream);
         else {
             unscan(token, stream);
-            return;
+            return list_init(arithmetic_specifier_init(int_t));
         }
     }
 }
 
-void syntax_a_conditional(FILE *stream)
+list *syntax_a_conditional(FILE *stream)
 {
-    syntax_a_logical_or(stream);
+    list *llist = syntax_a_logical_or(stream), *rlist;
     char *token = scan(stream);
     if (!strcmp(token, "?")) {
-        syntax_a_conditional(stream);
+        llist = syntax_a_conditional(stream);
         token = scan(stream);
-        syntax_a_conditional(stream);
+        rlist = syntax_a_conditional(stream);
+        return alconv(llist, rlist);
     }
     else {
         unscan(token, stream);
-        return;
+        return llist;
     }
 }
 
@@ -717,18 +731,32 @@ void error_message(char *message)
     fprintf(stderr, "%s:%d:%d: error: %s\n", file_info.file_name, file_info.line, file_info.column, message);
 }
 
+declarator_info_t *declarator_info_init(char *id, list *type_list, int line, int column) {
+    declarator_info_t *retptr = malloc(sizeof(declarator_info_t));
+    retptr->type = declarator_info_type;
+    retptr->id = id;
+    retptr->type_list = type_list;
+    retptr->line = line;
+    retptr->column = column;
+    return retptr;
+}
+
 /* 
  * abstract == 0 : id
  * abstract == 1 : no id
  * abstract == 2 : id or no id
  */
-declarator *syntax_declarator(FILE *stream, namespace_t *namespace, int abstract)
+declarator_info_t *syntax_declarator(FILE *stream, namespace_t *namespace, int abstract)
 {
     char *token, *id = 0;
     list *type_list = list_node();
 
     int line1 = file_info.line;
     int column1 = file_info.column;
+
+    int line;
+    int column;
+
     while (1) {
         token = scan(stream);
         if (!strcmp(token, "*")) {
@@ -759,9 +787,11 @@ declarator *syntax_declarator(FILE *stream, namespace_t *namespace, int abstract
         }
         jmp_buf env;
         goto t2; t1: end_stack_push(")", &env);
-        declarator *dptr = syntax_declarator(stream, namespace, abstract);
+        declarator_info_t *dptr = syntax_declarator(stream, namespace, abstract);
         if (dptr) {
             id = dptr->id;
+            line = dptr->line;
+            column = dptr->column;
             list *nlist = dptr->type_list;
             if (nlist->next) {
                 list *ptr = nlist;
@@ -781,32 +811,14 @@ declarator *syntax_declarator(FILE *stream, namespace_t *namespace, int abstract
         end_stack_pop(")"); longjmp(env, 1);
         t2: if (!setjmp(env)) goto t1;
     }
-    // else {
-    //     if (abstract == 0) {
-    //         if (is_id(token))
-    //             id = token;
-    //         else {
-    //             unscan(token, stream);
-    //             error(stream, "expected identifier or '('");
-    //         }
-    //     }
-    //     else if (abstract == 1)
-    //         unscan(token, stream);
-    //     else if (is_id(token))
-    //         id = token;
-    //     else
-    //         unscan(token, stream);
-    // }
     else if (abstract == 1)
         unscan(token, stream);
     else if (is_id(token)) {
+        unscan(token, stream);
         id = token;
-        if (find_declaration_cn(namespace, id) || find_typedef_cn(namespace, id)) {
-            unscan(token, stream);
-            errorh();
-            fprintf(stderr, "redefinition of '%s' as different kind of symbol\n", id);
-            scan(stream);
-        }
+        line = file_info.line;
+        column = file_info.column;
+        scan(stream);
     }
     else if (abstract == 0) {
         unscan(token, stream);
@@ -935,24 +947,40 @@ declarator *syntax_declarator(FILE *stream, namespace_t *namespace, int abstract
             type_list->prev = ptr;
             type_list = new_type_list->next;
             type_list->prev = 0;
-            return declarator_init(id, type_list);
+            return declarator_info_init(id, type_list, line, column);
         }
     }
 }
 
-void *syntax_initializer(FILE *stream, namespace_t *namespace)
+typedef struct {
+    int type;
+    list *type_list;
+    int line;
+    int column;
+} init_info_t;
+
+init_info_t *init_info_init(list *type_list, int line, int column) {
+    init_info_t *retptr = malloc(sizeof(init_info_t));
+    retptr->type = init_info_type;
+    retptr->type_list = type_list;
+    retptr->line = line;
+    retptr->column = column;
+    return retptr;
+}
+
+void *syntax_initializer(FILE *stream, namespace_t *namespace, int constant)
 {
     char *token = scan(stream);
     if (!strcmp(token, "{")) {
         list *retptr = list_node();
         token = scan(stream);
         if (!strcmp(token, "}"))
-            return;
+            return retptr;
         unscan(token, stream);
         jmp_buf env;
         goto t2; t1: end_stack_push("}", &env);
         while (1) {
-            void *val = syntax_initializer(stream, namespace);
+            void *val = syntax_initializer(stream, namespace, 1);
             list_append(retptr, val);
             token = scan(stream);
             if (!strcmp(token, ",")) {
@@ -977,7 +1005,147 @@ void *syntax_initializer(FILE *stream, namespace_t *namespace)
     }
     else {
         unscan(token, stream);
-        return syntax_assignment(stream, namespace);
+        int line = file_info.line;
+        int column = file_info.column;
+        if (constant) {
+            int offset = ftell(stream);
+            if (!syntax_assignment(stream, namespace))
+                return init_info_init(0, line, column);
+            else {
+                fseek(stream, offset, SEEK_SET);
+                file_info.line = line;
+                file_info.column = column;
+                return init_info_init(syntax_a_conditional(stream), line, column);
+            }
+        }
+        else
+            return init_info_init(syntax_assignment(stream, namespace), line, column);
+    }
+}
+
+static void syntax_initializing(list *llist, void *initializer)
+{
+    switch (type(llist->content)) {
+        case arithmetic_specifier_t: case enum_type: case pointer_t: case function_t: {
+            if (type(initializer) == list_t)
+                syntax_initializing(llist, ((list *)initializer)->next->content);
+            else {
+                init_info_t *init_info = initializer;
+                list *rlist = init_info->type_list;
+                int line = init_info->line;
+                int column = init_info->column;
+                if (llist->type == function_t)
+                    error_message_np(line, column, "illegal initializer");
+                else if (rlist) {
+                    int lt = type(llist->content), rt = type(rlist->content);
+                    if (lt == arithmetic_specifier_t && (rt == pointer_t || rt == array_t || rt == function_t)) {
+                        arithmetic_specifier *s = llist->content;
+                        if (s->atype == float_t || s->atype == double_t || s->atype == long_double_t) {
+                            errorh_np(line, column);
+                            fprintf(stderr, "initializing '%s' with an expression of incompatible type '%s'\n",
+                                type_list_to_str(llist), type_list_to_str(rlist));
+                        }
+                    }
+                    else if (rt == arithmetic_specifier_t && lt == pointer_t) {
+                        arithmetic_specifier *s = rlist->content;
+                        if (s->atype == float_t || s->atype == double_t || s->atype == long_double_t) {
+                            errorh_np(line, column);
+                            fprintf(stderr, "initializing '%s' with an expression of incompatible type '%s'\n",
+                                type_list_to_str(llist), type_list_to_str(rlist));
+                        }
+                    }
+                    else if ((lt == struct_specifier_t || lt == union_specifier_t) && !type_list_eq(llist, rlist)) {
+                        errorh_np(line, column);
+                        fprintf(stderr, "initializing '%s' with an expression of incompatible type '%s'\n",
+                            type_list_to_str(llist), type_list_to_str(rlist));
+                    }
+                }
+
+            }
+            return;
+        }
+        case array_t: {
+            array *a = llist->content;
+            void *content_s = llist->next->content;
+            int subsize = -1;
+            if (type(content_s) == array_t) {
+                array *a = content_s;
+                subsize = atoi(((arithmetic *)a->size)->value);
+            }
+            else if (type(content_s) == struct_specifier_t) {
+                struct_specifier *s = content_s;
+                if (s->declaration_list)
+                    subsize = list_len(s->declaration_list);
+                else
+                    subsize = 0;
+            }
+            int size = 0, i;
+            list *stmts = list_node(), *ptr;
+            if (a->size)
+                size = atoi(((arithmetic *)a->size)->value);
+            for (i = 0, ptr = ((list *)initializer)->next; ptr; i++) {
+                void *inival;
+                if (ptr->content && type(ptr->content) == list_t) {
+                    inival = ptr->content;
+                    ptr = ptr->next;
+                }
+                else if (subsize >= 0) {
+                    int i;
+                    list *sub_initializer = list_node();
+                    for (i = 0; i < subsize && ptr; i++, ptr = ptr->next)
+                        list_append(sub_initializer, ptr->content);
+                    inival = sub_initializer;
+                }
+                else {
+                    inival = ptr->content;
+                    ptr = ptr->next;
+                }
+                syntax_initializing(llist->next, inival);
+                if (size && i == size)
+                    return;
+            }
+            return;
+        }
+        case struct_specifier_t: {
+            struct_specifier *specifier = llist->content;
+            if (!specifier->declaration_list)
+                return;
+            list *stmts = list_node(), *ptr, *ptr2;
+            for (ptr = specifier->declaration_list->next, ptr2 = ((list *)initializer)->next;
+                       ptr && ptr2; ptr = ptr->next) {
+                declaration *node = ptr->content;
+                void *s = node->type_list->content, *inival;
+                int subsize = -1;
+                if (type(s) == array_t) {
+                    array *a = s;
+                    subsize = atoi(((arithmetic *)a->size)->value);
+                }
+                else if (type(s) == struct_specifier_t) {
+                    struct_specifier *ss = s;
+                    if (ss->declaration_list)
+                        subsize = list_len(ss->declaration_list);
+                    else
+                        subsize = 0;
+                }
+                if (ptr2->content && type(ptr2->content) == list_t) {
+                    inival = ptr2->content;
+                    ptr2 = ptr2->next;
+                }
+                else if (subsize >= 0) {
+                    list *sub_initializer = list_node();
+                    int i;
+                    for (i = 0; i < subsize && ptr2; i++, ptr2 = ptr2->next)
+                        list_append(sub_initializer, ptr2->content);
+                    inival = sub_initializer;
+                }
+                else {
+                    inival = ptr2->content;
+                    ptr2 = ptr2->next;
+                }
+                syntax_initializing(node->type_list, inival);
+            }
+            return;
+        }
     }
 }
 
@@ -995,7 +1163,9 @@ void syntax_declaration(FILE *stream, namespace_t *namespace, int in_struct)
     jmp_buf env;
     goto t2; t1: end_stack_push(";", &env);
     while (1) {
-        declarator *dptr = syntax_declarator(stream, namespace, 0);
+        declarator_info_t *dptr = syntax_declarator(stream, namespace, 0);
+        int line = dptr->line;
+        int column = dptr->column;
         list *type_list = dptr->type_list;
         list *ptr = type_list;
         while (ptr->next)
@@ -1016,7 +1186,23 @@ void syntax_declaration(FILE *stream, namespace_t *namespace, int in_struct)
             ptr->content = specifier;
         char *id = dptr->id;
         if (id) {
-            if (type(storage) == typedef_storage_t)
+            void *val;
+            if ((val=find_declaration_cn(namespace, id)) || (val=find_typedef_cn(namespace, id))) {
+                if (type(val) == declaration_t && type(storage) == typedef_storage_t ||
+                          type(val) == typedef_type && type(storage) != typedef_storage_t) {
+                    errorh_np(line, column);
+                    fprintf(stderr, "'%s' redeclared as different kind of symbol\n", id);
+                }
+                else if (!type_list_eq(get_type_list(val), type_list)) {
+                    errorh_np(line, column);
+                    fprintf(stderr, "conflicting types for '%s'\n", id);
+                }
+                else if (type(val) == declaration_t) {
+                    errorh_np(line, column);
+                    fprintf(stderr, "redefinition of '%s'\n", id);
+                }
+            }
+            else if (type(storage) == typedef_storage_t)
                 list_append(namespace->typedefs, typedef_init(id, type_list));
             else
                 list_append(namespace->declaration_list, declaration_init(id, storage, type_list));
@@ -1040,7 +1226,8 @@ void syntax_declaration(FILE *stream, namespace_t *namespace, int in_struct)
             if (!strcmp(token, ","))
                 ;
             else if (!strcmp(token, "=")) {
-                syntax_initializer(stream, namespace);
+                list *initializer = syntax_initializer(stream, namespace, 0);
+                syntax_initializing(type_list, initializer);
                 token = scan(stream);
                 if (!strcmp(token, ","))
                     continue;
@@ -1072,7 +1259,7 @@ list *syntax_type_name(FILE *stream, namespace_t *namespace)
 {
     list *specifiers = syntax_specifier(stream, namespace);
     void *specifier = specifiers->next->next->content;
-    declarator *dptr = syntax_declarator(stream, namespace, 1);
+    declarator_info_t *dptr = syntax_declarator(stream, namespace, 1);
     list *type_list = dptr->type_list;
     list *ptr = type_list;
     while (ptr->next)
@@ -1118,7 +1305,7 @@ list *syntax_primary(FILE *stream, namespace_t *namespace)
         return retptr;
     }
     else if (is_id(token)) {
-        declaration *dptr = find_declaration(namespace, token);
+        declaration *dptr = find_identifier(namespace, token);
         if (!dptr) {
             unscan(token, stream);
             errorh();
@@ -1152,7 +1339,7 @@ static inline list *syntax_argument_expression_list(FILE *stream, namespace_t *n
 {
     char *token;
     list *retptr = list_node();
-    int error;
+    int error = 0;
     while (1) {
         list *cur = syntax_assignment(stream, namespace);
         if (!cur)
@@ -1256,7 +1443,7 @@ static list *epost_suref(char *token, list *llist, int line, int column)
     return llist;
 }
 
-static inline list *type_list_copy(list *type_list)
+inline list *type_list_copy(list *type_list)
 {
     list *retptr = list_init(type_list->content);
     list *ptr, *ptr2;
@@ -1379,9 +1566,10 @@ list *syntax_postfix(FILE *stream, namespace_t *namespace)
                     error(stream, 0);
                 }
                 end_stack_pop();
-                longjmp(env, 1);
+                goto t5;
                 t4: if (!setjmp(env)) goto t3;
                 arguments = 0;
+                t5: ;
             }
             if (llist && arguments) {
                 if (type(llist->content) == function_t || (type(llist->content) == pointer_t &&
@@ -2052,14 +2240,14 @@ list *syntax_shift(FILE *stream, namespace_t *namespace) {
                     }
                     else {
                         errorh_np(line, column);
-                        fprintf(stderr, "invalid operands to binary %s (hava '%s' and '%s'\n",
+                        fprintf(stderr, "invalid operands to binary %s (hava '%s' and '%s')\n",
                                      !strcmp(token, "<<") ? "<<" : ">>", type_list_to_str(llist), type_list_to_str(rlist));
                         llist = 0;
                     }
                 }
                 else {
                     errorh_np(line, column);
-                    fprintf(stderr, "invalid operands to binary %s (hava '%s' and '%s'\n",
+                    fprintf(stderr, "invalid operands to binary %s (hava '%s' and '%s')\n",
                                  !strcmp(token, "<<") ? "<<" : ">>", type_list_to_str(llist), type_list_to_str(rlist));
                     llist = 0;
                 }
@@ -2591,9 +2779,11 @@ void syntax_declaration_or_statement(FILE *stream, namespace_t *namespace)
 {
     char *token = scan(stream);
     unscan(token, stream);
-    if (is_specifier(token) || is_storage(token) || is_qualifier(token) || find_typedef(namespace, token))
-        return syntax_declaration(stream, namespace, 0);
-    return syntax_statement(stream, namespace);
+    if (is_specifier(token) || is_storage(token) || is_qualifier(token) || find_typedef_cn(namespace, token) ||
+              (!find_declaration_cn(namespace, token) && find_typedef(namespace->outer, token)))
+        syntax_declaration(stream, namespace, 0);
+    else
+        syntax_statement(stream, namespace);
 }
 
 void end_stack_push(char *token, jmp_buf *env)
@@ -2762,7 +2952,15 @@ void syntax_id_labeled_stmt(FILE *stream, namespace_t *namespace)
     }
     add_label(namespace, token);
     token = scan(stream);
-    syntax_statement(stream, namespace);
+    token = scan(stream);
+    unscan(token, stream);
+    if (is_specifier(token) || is_storage(token) || is_qualifier(token) || find_typedef_cn(namespace, token) ||
+              (!find_declaration_cn(namespace, token) && find_typedef(namespace->outer, token))) {
+        error_message("expected expression");
+        syntax_declaration(stream, namespace, 0);
+    }
+    else
+        syntax_statement(stream, namespace);
 }
 
 void syntax_while_stmt(FILE *stream, namespace_t *namespace)
@@ -2997,7 +3195,9 @@ void syntax_external_declaration(FILE *stream, namespace_t *namespace)
     void *storage = specifiers->next->content;
     void *specifier = specifiers->next->next->content;
     if (!storage)
-        storage = static_storage_init(0, 0);
+        storage = static_storage_init(-1, -1);
+    if (type(storage) == static_storage_t)
+        ((static_storage *)storage)->initialized = -1;
     char *token = scan(stream);
     if (!strcmp(token, ";"))
         return;
@@ -3006,7 +3206,9 @@ void syntax_external_declaration(FILE *stream, namespace_t *namespace)
     jmp_buf env;
     goto t2; t1: end_stack_push(";", &env);
     while (1) {
-        declarator *dptr = syntax_declarator(stream, namespace, 0);
+        declarator_info_t *dptr = syntax_declarator(stream, namespace, 0);
+        int line = dptr->line;
+        int column = dptr->column;
         list *type_list = dptr->type_list;
         list *ptr = type_list;
         while (ptr->next)
@@ -3026,14 +3228,56 @@ void syntax_external_declaration(FILE *stream, namespace_t *namespace)
         else
             ptr->content = specifier;
         char *id = dptr->id;
+
+        declaration *node;
+        func *func_;
+
+        int defined = 0;
+
         if (id) {
-            if (type(storage) == typedef_storage_t)
+            void *val = find_identifier(namespace, id);
+            if (val) {
+                if (type(val) == typedef_type) {
+                    errorh_np(line, column);
+                    fprintf(stderr, "'%s' redeclared as different kind of symbol\n", id);
+                }
+                else if (!type_list_eq(get_type_list(val), type_list)) {
+                    errorh_np(line, column);
+                    fprintf(stderr, "conflicting types for '%s'\n", id);
+                }
+                else if (type(val) == func_t) {
+                    if (((func *)val)->tag)
+                        defined = 1;
+                    else
+                        defined = 0;
+                }
+                else if (type(val) == declaration_t) {
+                    static_storage *s = ((declaration *)val)->storage;
+                    if (s->initialized != -1)
+                        defined = 1;
+                    else
+                        defined = 0;
+                }
+            }
+            else if (type(storage) == typedef_storage_t)
                 list_append(namespace->typedefs, typedef_init(id, type_list));
-            else
-                list_append(namespace->declaration_list, declaration_init(id, storage, type_list));
+            else if (type(type_list->content) == function_t) {
+                func_ = func_init(id, 0, type_list);
+                list_append(func_list, func_);
+            }
+            else {
+                node = declaration_init(id, storage, type_list);
+                list_append(namespace->declaration_list, node);
+            }
         }
         token = scan(stream);
         if (!strcmp(token, "{")) {
+            if (defined) {
+                errorh_np(line, column);
+                fprintf(stderr, "redefinition of '%s'\n", id);
+            }
+            else
+                func_->tag = strdup("x");
             unscan(token, stream);
             if (type(type_list->content) != function_t)
                 error(stream, "expected ';' after top level declarator");
@@ -3053,7 +3297,14 @@ void syntax_external_declaration(FILE *stream, namespace_t *namespace)
         else if (!strcmp(token, ","))
             ;
         else if (!strcmp(token, "=")) {
-            syntax_initializer(stream, namespace);
+            if (defined) {
+                errorh_np(line, column);
+                fprintf(stderr, "redefinition of '%s'\n", id);
+            }
+            else
+                ((static_storage *)node->storage)->initialized = 1;
+            list *initializer = syntax_initializer(stream, namespace, 1);
+            syntax_initializing(type_list, initializer);
             token = scan(stream);
             if (!strcmp(token, ","))
                 continue;

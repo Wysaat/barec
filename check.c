@@ -91,11 +91,10 @@ list *alconv(list *llist, list *rlist) {
     return rlist;
 }
 
-list *syntax_aconstant(FILE *stream)
-{
+list *syntax_aconstant(FILE *stream, namespace_t *namespace) {
     char *token = scan(stream);
     if (!strcmp(token, "(")) {
-        list *retptr = syntax_a_conditional(stream);
+        list *retptr = syntax_a_conditional(stream, namespace);
         token = scan(stream);
         return retptr;
     }
@@ -105,28 +104,31 @@ list *syntax_aconstant(FILE *stream)
         return list_init(arithmetic_specifier_init(float_t));
     else {
         unscan(token, stream);
-        error(stream, "expression is not an integer constant expression");
+        is_static_addr = 0;
+        syntax_unary(stream, namespace);
+        if (!is_static_addr)
+            error(stream, "expression is not an integer constant expression");
     }
 }
 
-list *syntax_a_unary(FILE *stream)
+list *syntax_a_unary(FILE *stream, namespace_t *namespace)
 {
     char *token = scan(stream);
     if (!strcmp(token, "+") || !strcmp(token, "-") || !strcmp(token, "!") || !strcmp(token, "~"))
-        return syntax_aconstant(stream);
+        return syntax_aconstant(stream, namespace);
     else {
         unscan(token, stream);
-        return syntax_aconstant(stream);
+        return syntax_aconstant(stream, namespace);
     }
 }
 
-list *syntax_a_m_expr(FILE *stream)
+list *syntax_a_m_expr(FILE *stream, namespace_t *namespace)
 {
-    list *llist = syntax_a_unary(stream);
+    list *llist = syntax_a_unary(stream, namespace);
     while (1) {
         char *token = scan(stream);
         if (!strcmp(token, "*") || !strcmp(token, "/") || !strcmp(token, "%"))
-            llist = alconv(llist, syntax_a_unary(stream));
+            llist = alconv(llist, syntax_a_unary(stream, namespace));
         else {
             unscan(token, stream);
             return llist;
@@ -134,13 +136,13 @@ list *syntax_a_m_expr(FILE *stream)
     }
 }
 
-list *syntax_a_a_expr(FILE *stream)
+list *syntax_a_a_expr(FILE *stream, namespace_t *namespace)
 {
-    list *llist = syntax_a_m_expr(stream);
+    list *llist = syntax_a_m_expr(stream, namespace);
     while (1) {
         char *token = scan(stream);
         if (!strcmp(token, "+") || !strcmp(token, "-"))
-            llist = alconv(llist, syntax_a_m_expr(stream));
+            llist = alconv(llist, syntax_a_m_expr(stream, namespace));
         else {
             unscan(token, stream);
             return llist;
@@ -148,13 +150,13 @@ list *syntax_a_a_expr(FILE *stream)
     }
 }
 
-list *syntax_a_shift(FILE *stream)
+list *syntax_a_shift(FILE *stream, namespace_t *namespace)
 {
-    syntax_a_a_expr(stream);
+    syntax_a_a_expr(stream, namespace);
     while (1) {
         char *token = scan(stream);
         if (!strcmp(token, ">>") || !strcmp(token, "<<"))
-            syntax_a_a_expr(stream);
+            syntax_a_a_expr(stream, namespace);
         else {
             unscan(token, stream);
             return list_init(arithmetic_specifier_init(int_t));
@@ -162,13 +164,13 @@ list *syntax_a_shift(FILE *stream)
     }
 }
 
-list *syntax_a_relational(FILE *stream)
+list *syntax_a_relational(FILE *stream, namespace_t *namespace)
 {
-    syntax_a_shift(stream);
+    syntax_a_shift(stream, namespace);
     while (1) {
         char *token = scan(stream);
         if (!strcmp(token, "<") || !strcmp(token, ">") || !strcmp(token, "<=") || !strcmp(token, ">="))
-            syntax_a_shift(stream);
+            syntax_a_shift(stream, namespace);
         else {
             unscan(token, stream);
             return list_init(arithmetic_specifier_init(int_t));
@@ -176,13 +178,13 @@ list *syntax_a_relational(FILE *stream)
     }
 }
 
-list *syntax_a_equality(FILE *stream)
+list *syntax_a_equality(FILE *stream, namespace_t *namespace)
 {
-    syntax_a_relational(stream);
+    syntax_a_relational(stream, namespace);
     while (1) {
         char *token = scan(stream);
         if (!strcmp(token, "==") || !strcmp(token, "!="))
-            syntax_a_relational(stream);
+            syntax_a_relational(stream, namespace);
         else {
             unscan(token, stream);
             return list_init(arithmetic_specifier_init(int_t));
@@ -190,13 +192,13 @@ list *syntax_a_equality(FILE *stream)
     }
 }
 
-list *syntax_a_and(FILE *stream)
+list *syntax_a_and(FILE *stream, namespace_t *namespace)
 {
-    syntax_a_equality(stream);
+    syntax_a_equality(stream, namespace);
     while (1) {
         char *token = scan(stream);
         if (!strcmp(token, "&"))
-            syntax_a_equality(stream);
+            syntax_a_equality(stream, namespace);
         else {
             unscan(token, stream);
             return list_init(arithmetic_specifier_init(int_t));
@@ -204,13 +206,13 @@ list *syntax_a_and(FILE *stream)
     }
 }
 
-list *syntax_a_xor(FILE *stream)
+list *syntax_a_xor(FILE *stream, namespace_t *namespace)
 {
-    syntax_a_and(stream);
+    syntax_a_and(stream, namespace);
     while (1) {
         char *token = scan(stream);
         if (!strcmp(token, "^"))
-            syntax_a_and(stream);
+            syntax_a_and(stream, namespace);
         else {
             unscan(token, stream);
             return list_init(arithmetic_specifier_init(int_t));
@@ -218,13 +220,13 @@ list *syntax_a_xor(FILE *stream)
     }
 }
 
-list *syntax_a_or(FILE *stream)
+list *syntax_a_or(FILE *stream, namespace_t *namespace)
 {
-    syntax_a_xor(stream);
+    syntax_a_xor(stream, namespace);
     while (1) {
         char *token = scan(stream);
         if (!strcmp(token, "|"))
-            syntax_a_xor(stream);
+            syntax_a_xor(stream, namespace);
         else {
             unscan(token, stream);
             return list_init(arithmetic_specifier_init(int_t));
@@ -232,13 +234,13 @@ list *syntax_a_or(FILE *stream)
     }
 }
 
-list *syntax_a_logical_and(FILE *stream)
+list *syntax_a_logical_and(FILE *stream, namespace_t *namespace)
 {
-    syntax_a_or(stream);
+    syntax_a_or(stream, namespace);
     while (1) {
         char *token = scan(stream);
         if (!strcmp(token, "&&"))
-            syntax_a_or(stream);
+            syntax_a_or(stream, namespace);
         else {
             unscan(token, stream);
             return list_init(arithmetic_specifier_init(int_t));
@@ -246,13 +248,13 @@ list *syntax_a_logical_and(FILE *stream)
     }
 }
 
-list *syntax_a_logical_or(FILE *stream)
+list *syntax_a_logical_or(FILE *stream, namespace_t *namespace)
 {
-    syntax_a_logical_and(stream);
+    syntax_a_logical_and(stream, namespace);
     while (1) {
         char *token = scan(stream);
         if (!strcmp(token, "||"))
-            syntax_a_logical_and(stream);
+            syntax_a_logical_and(stream, namespace);
         else {
             unscan(token, stream);
             return list_init(arithmetic_specifier_init(int_t));
@@ -260,14 +262,14 @@ list *syntax_a_logical_or(FILE *stream)
     }
 }
 
-list *syntax_a_conditional(FILE *stream)
+list *syntax_a_conditional(FILE *stream, namespace_t *namespace)
 {
-    list *llist = syntax_a_logical_or(stream), *rlist;
+    list *llist = syntax_a_logical_or(stream, namespace), *rlist;
     char *token = scan(stream);
     if (!strcmp(token, "?")) {
-        llist = syntax_a_conditional(stream);
+        llist = syntax_a_conditional(stream, namespace);
         token = scan(stream);
-        rlist = syntax_a_conditional(stream);
+        rlist = syntax_a_conditional(stream, namespace);
         return alconv(llist, rlist);
     }
     else {
@@ -310,7 +312,7 @@ list *syntax_enumerator_body(FILE *stream, namespace_t *namespace)
                 fseek(stream, offset, SEEK_SET);
                 file_info.line = line;
                 file_info.column = column;
-                syntax_a_conditional(stream);
+                syntax_a_conditional(stream, namespace);
                 fseek(stream, offset, SEEK_SET);
                 file_info.line = line;
                 file_info.column = column;
@@ -1015,7 +1017,7 @@ void *syntax_initializer(FILE *stream, namespace_t *namespace, int constant)
                 fseek(stream, offset, SEEK_SET);
                 file_info.line = line;
                 file_info.column = column;
-                return init_info_init(syntax_a_conditional(stream), line, column);
+                return init_info_init(syntax_a_conditional(stream, namespace), line, column);
             }
         }
         else
@@ -1283,6 +1285,7 @@ list *syntax_type_name(FILE *stream, namespace_t *namespace)
 
 list *syntax_primary(FILE *stream, namespace_t *namespace)
 {
+    is_static_declaration = is_static_addr = 0;
     char *token = scan(stream);
     if (is_int(token)) {
         list *retptr = list_init(arithmetic_specifier_init(int_t));
@@ -1313,8 +1316,15 @@ list *syntax_primary(FILE *stream, namespace_t *namespace)
             scan(stream);
             return 0;
         }
-        else
-            return type_list_copy(get_type_list(dptr));
+        else {
+            list *retptr = type_list_copy(get_type_list(dptr));
+            if (type(dptr->storage) == static_storage_t) {
+                is_static_declaration = 1;
+                if (type(retptr->content) == array_t)
+                    is_static_addr = 1;
+            }
+            return retptr;
+        }
     }
     else if (!strcmp(token, "(")) {
         jmp_buf env;
@@ -1551,6 +1561,7 @@ list *syntax_postfix(FILE *stream, namespace_t *namespace)
             }
         }
         else if (!strcmp(token, "(")) {
+            is_static_declaration = 0;
             token = scan(stream);
             list *arguments;
             if (!strcmp(token, ")"))
@@ -1708,6 +1719,8 @@ list *syntax_unary(FILE *stream, namespace_t *namespace)
                 ulist = newlist;
             }
         }
+        if (is_static_declaration)
+            is_static_addr = 1;
     }
     else if (!strcmp(token, "*")) {
         ulist = syntax_cast(stream, namespace);
@@ -1722,6 +1735,12 @@ list *syntax_unary(FILE *stream, namespace_t *namespace)
                 error_message_np(line, column, "indirection requires pointer operand");
             }
         }
+        if (is_static_addr) {
+            is_static_addr = 0;
+            is_static_declaration = 1;
+        }
+        else
+            is_static_declaration = 0;
     }
     else if (!strcmp(token, "+") || !strcmp(token, "-")) {
         ulist = syntax_cast(stream, namespace);

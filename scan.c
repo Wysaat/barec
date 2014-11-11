@@ -1108,7 +1108,11 @@ void *parse_declaration(FILE *stream, namespace_t *namespace, int in_struct)
         else
             list_append(namespace->typedefs, typedef_init(id, type_list));
         token = scan(stream);
-        if (!in_struct) {
+        if (in_struct) {
+            if (!strcmp(token, ";"))
+                return 0;
+        }
+        else {
             void *initializer = 0;
             int got_eq = 0;
             if (!strcmp(token, "=")) {

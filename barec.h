@@ -3,6 +3,9 @@
 
 #include <stdio.h>
 
+int is_static_addr;
+int is_static_declaration;
+
 typedef struct list list;
 typedef struct buffer buffer;
 
@@ -670,7 +673,7 @@ void syntax_break_stmt(FILE *stream, namespace_t *namespace);
 void syntax_return_stmt(FILE *stream, namespace_t *namespace);
 void syntax_external_declaration(FILE *stream, namespace_t *namespace);
 void syntax_translation_unit(FILE *stream);
-list *syntax_a_conditional(FILE *stream);
+list *syntax_a_conditional(FILE *stream, namespace_t *namespace);
 void error_message_np(int line, int column, char *message);
 void errorh_np(int line, int column);
 int type_list_eq(list *left, list *right);

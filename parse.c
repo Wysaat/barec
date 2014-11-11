@@ -210,7 +210,7 @@ funcall_struct_ref_t *funcall_struct_ref_init(funcall *primary, char *id) {
 }
 
 void *STRUCT_REF(void *primary, char *id) {
-    struct_specifier *specifier = get_type_list(primary)->next->content;
+    struct_specifier *specifier = get_type_list(primary)->content;
     struct size *offset = size_init(1, 0, 0);
     list *ptr;
     for (ptr = specifier->declaration_list->next; ptr; ptr = ptr->next) {
