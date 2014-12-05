@@ -413,14 +413,23 @@
 //     return g;
 // }
 
-struct test {
-    int a;
-    int b;
+int a[3];
+int b = &a;
+struct info {
+    int x;
+    int y;
+    int z;
 };
+struct info c;
+int d = &c;
+int e = &c.z;
+// struct info c = { 1, 2, 3 };
 
-struct test t = { 3, 4 };
-int b;
-// int a = &b + 4;
+// int main()
+// {
+//     printf("&a is %p, &b is %p, &c is %p, &d is %p, &e is %p\n", &a, &b, &c, &d, &e);
+//     return 0;
+// }
 
 // typedef int DType;
 

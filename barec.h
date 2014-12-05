@@ -582,6 +582,8 @@ struct size *size(list *type_list);
 void storage_add_size(auto_storage *left, struct size *right);
 auto_storage *auto_storage_add_size_nip(auto_storage *left, struct size *right);
 auto_storage *auto_storage_sub_size_nip(auto_storage *left, struct size *right);
+static_addr_t *static_addr_init(int value, int initialized);
+inline declaration *declaration_copy(declaration *node);
 
 /*
  * utils.c

@@ -1281,17 +1281,17 @@ void *parse_postfix(FILE *stream, namespace_t *namespace)
             token = scan(stream);
             void *specifier = get_type_list(primary)->content;
             if (type(specifier) == struct_specifier_t)
-                primary = STRUCT_REF(ADDR(primary), token);
+                primary = STRUCT_REF(primary, token);
             else
-                primary = UNION_REF(ADDR(primary), token);
+                primary = UNION_REF(primary, token);
         }
         else if (!strcmp(token, "->")) {
             token = scan(stream);
             void *specifier = get_type_list(primary)->content;
             if (type(specifier) == struct_specifier_t)
-                primary = STRUCT_REF(primary, token);
+                primary = STRUCT_REF(INDIRECTION(primary), token);
             else if (type(specifier) == union_specifier_t)
-                primary = UNION_REF(primary, token);
+                primary = UNION_REF(INDIRECTION(primary), token);
         }
         else if (!strcmp(token, "++")) {
             primary = POSINC(primary, 1);
@@ -1327,8 +1327,9 @@ void *parse_unary(FILE *stream, namespace_t *namespace)
         return PREINC(parse_unary(stream, namespace), 1);
     else if (!strcmp(token, "--"))
         return PREINC(parse_unary(stream, namespace), 0);
-    else if (!strcmp(token, "&"))
+    else if (!strcmp(token, "&")) {
         return ADDR(parse_cast(stream, namespace));
+    }
     else if (!strcmp(token, "*"))
         return INDIRECTION(parse_cast(stream, namespace));
     else if (!strcmp(token, "+") || !strcmp(token, "-")
@@ -1479,10 +1480,33 @@ void *parse_a_expr(FILE *stream, namespace_t *namespace) {
                 void **ptr = arithmetic_conversion(expr, expr2);
                 expr = BINARY(btype, *ptr, *(ptr+1));
             }
-            else if ((get_type(expr) == pointer_t || get_type(expr) == array_t) && type_is_int(expr2))
-                expr = BINARY(btype, expr, BINARY(mul, expr2, size_expr(get_type_list(INDIRECTION(expr)))));
-            else if ((get_type(expr2) == pointer_t || get_type(expr2) == array_t) && type_is_int(expr))
+            else if ((get_type(expr) == pointer_t || get_type(expr) == array_t) && type_is_int(expr2)) {
+                if (type(expr) == addr_t && type(((addr *)expr)->expr) == declaration_t &&
+                          type(((declaration *)((addr *)expr)->expr)->storage) == static_storage_t &&
+                                type(expr2) == arithmetic_t) {
+                    declaration *odptr = ((addr *)expr)->expr;
+                    declaration *dptr = declaration_copy(odptr);
+                    struct size *ss = size(expr);
+                    int offset = atoi(((arithmetic *)expr2)->value) * ss->ival;
+                    ((static_storage *)dptr->storage)->ival += offset;
+                    expr = ADDR(dptr);
+                }
+                else
+                    expr = BINARY(btype, expr, BINARY(mul, expr2, size_expr(get_type_list(INDIRECTION(expr)))));
+            }
+            else if ((get_type(expr2) == pointer_t || get_type(expr2) == array_t) && type_is_int(expr)) {
+                if (type(expr2) == addr_t && type(((addr *)expr2)->expr) == declaration_t &&
+                          type(((declaration *)((addr *)expr2)->expr)->storage) == static_storage_t &&
+                                type(expr) == arithmetic_t) {
+                    declaration *odptr = ((addr *)expr2)->expr;
+                    declaration *dptr = declaration_copy(odptr);
+                    struct size *ss = size(expr2);
+                    int offset = atoi(((arithmetic *)expr)->value) * ss->ival;
+                    ((static_storage *)dptr->storage)->ival += offset;
+                    expr = ADDR(dptr);
+                }
                 expr = BINARY(btype, expr2, BINARY(mul, expr, size_expr(get_type_list(INDIRECTION(expr2)))));
+            }
         }
         else {
             unscan(token, stream);
@@ -2200,7 +2224,7 @@ translation_unit_t *parse_translation_unit(FILE *stream)
         declaration *node = ptr->content;
         static_storage *storage = node->storage;
         if (storage->initialized == -1) {
-            storage = static_storage_init(bss_size, 0);
+            node->storage = static_storage_init(bss_size, 0);
             bss_size += size(node->type_list)->ival;
             list *stmts = list_node();
             list_append(stmts, ASSIGNMENT(ptr->content, 0));

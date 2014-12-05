@@ -1,17 +1,12 @@
-// int a = 3;
-// int b = 4;
+int a;
+int a;
+int a;
 
-// struct test {
-//     int a;
-//     int b;
-// };
+// int b = &a;
 
-// int main() {
-// 	int c = a + b;
-// 	return 3;
-// }
+int a = 3;
 
-struct matrix {
-    int content[4][4];
-    float fcontent[3];
-};
+int main()
+{
+	return 0;
+}

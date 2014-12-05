@@ -1312,6 +1312,14 @@ static inline char *constant_value(void *constant)
     switch (type(constant)) {
         case arithmetic_t:
             return ((arithmetic *)constant)->value;
+        case addr_t: {
+            declaration *dptr = ((addr *)constant)->expr;
+            static_storage *ss = dptr->storage;
+            if (ss->initialized)
+                return data_addr(ss->ival);
+            else
+                return bss_addr(ss->ival);
+        }
     }
 }
 

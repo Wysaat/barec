@@ -6,6 +6,14 @@ int type(void *stmt) {
     return *(int *)stmt;
 }
 
+static_addr_t *static_addr_init(int value, int initialized) {
+    static_addr_t *retptr = malloc(sizeof(static_addr_t));
+    retptr->type = static_addr_type;
+    retptr->value = value;
+    retptr->initialized = initialized;
+    return retptr;
+}
+
 auto_storage *auto_storage_init(int constant, int ival, void *vval)
 {
     auto_storage *retptr = malloc(sizeof(auto_storage));
@@ -123,12 +131,34 @@ void *ARRAY_REF(void *primary, void *expr) {
     int lt = type(llist->content);
     void *expr2;
     if (lt == pointer_t || lt == array_t) {
-        void *size = size_expr(llist->next);
-        expr2 = BINARY(add, primary, BINARY(mul, expr, size));
+        if (type(primary) == declaration_t && type(((declaration *)primary)->storage) == static_storage_t &&
+                  type(expr) == arithmetic_t) {
+            declaration *dptr = declaration_copy(primary);
+            static_storage *bs = ((declaration *)primary)->storage;
+            struct size *ss = size(primary);
+            int v = atoi(((arithmetic *)expr)->value);
+            dptr->storage = static_storage_init(bs->ival+ss->ival*v, bs->initialized);
+            return dptr;
+        }
+        else {
+            void *size = size_expr(llist->next);
+            expr2 = BINARY(add, primary, BINARY(mul, expr, size));
+        }
     }
     else {
-        void *size = size_expr(rlist->next);
-        expr2 = BINARY(add, expr, BINARY(mul, primary, size));
+        if (type(expr) == declaration_t && type(((declaration *)expr)->storage) == static_storage_t &&
+                  type(primary) == arithmetic_t) {
+            declaration *dptr = declaration_copy(expr);
+            static_storage *bs = ((declaration *)expr)->storage;
+            struct size *ss = size(expr);
+            int v = atoi(((arithmetic *)primary)->value);
+            dptr->storage = static_storage_init(bs->ival+ss->ival*v, bs->initialized);
+            return dptr;
+        }
+        else {
+            void *size = size_expr(rlist->next);
+            expr2 = BINARY(add, expr, BINARY(mul, primary, size));
+        }
     }
     return INDIRECTION(expr2);
 }
@@ -209,6 +239,10 @@ funcall_struct_ref_t *funcall_struct_ref_init(funcall *primary, char *id) {
     return retptr;
 }
 
+inline declaration *declaration_copy(declaration *node) {
+    return declaration_init(node->id, node->storage, node->type_list);
+}
+
 void *STRUCT_REF(void *primary, char *id) {
     struct_specifier *specifier = get_type_list(primary)->content;
     struct size *offset = size_init(1, 0, 0);
@@ -218,7 +252,14 @@ void *STRUCT_REF(void *primary, char *id) {
         if (!strcmp(node->id, id)) {
             list *type_list = list_init(pointer_init());
             list_extend(type_list, node->type_list);
-            return INDIRECTION(CAST(type_list, BINARY(add, primary, size_to_expr(offset))));
+            if (type(primary) == declaration_t && type(((declaration *)primary)->storage) == static_storage_t) {
+                declaration *dptr = declaration_copy(node);
+                static_storage *bs = ((declaration *)primary)->storage;
+                dptr->storage = static_storage_init(bs->ival+offset->ival, bs->initialized);
+                return dptr;
+            }
+            else
+                return INDIRECTION(CAST(type_list, BINARY(add, primary, size_to_expr(offset))));
         }
         size_add(offset, size(node->type_list));
     }
@@ -253,6 +294,8 @@ preinc *PREINC(void *expr, int inc) {
 }
 
 void *ADDR(void *expr) {
+    if (type(expr) == indirection_t)
+        return ((indirection *)expr)->expr;
     list *type_list = get_type_list(expr);
     if (type(type_list->content) == function_t)
         return expr;
@@ -266,6 +309,8 @@ void *ADDR(void *expr) {
 }
 
 void *INDIRECTION(void *expr) {
+    if (type(expr) == addr_t)
+        return ((addr *)expr)->expr;
     list *type_list = get_type_list(expr);
     if (type(type_list->content) == function_t)
         return expr;

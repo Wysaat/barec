@@ -94,6 +94,10 @@ list *alconv(list *llist, list *rlist) {
 list *syntax_aconstant(FILE *stream, namespace_t *namespace) {
     char *token = scan(stream);
     if (!strcmp(token, "(")) {
+        char *token = scan(stream);
+        unscan(token, stream);
+        if (is_specifier(token) || is_qualifier(token) || find_typedef(namespace, token))
+            error(stream, "expression is not an integer constant expression");
         list *retptr = syntax_a_conditional(stream, namespace);
         token = scan(stream);
         return retptr;
@@ -106,7 +110,9 @@ list *syntax_aconstant(FILE *stream, namespace_t *namespace) {
         unscan(token, stream);
         is_static_addr = 0;
         syntax_unary(stream, namespace);
-        if (!is_static_addr)
+        if (is_static_addr)
+            return list_init(arithmetic_specifier_init(int_t));
+        else
             error(stream, "expression is not an integer constant expression");
     }
 }
@@ -1509,7 +1515,16 @@ list *syntax_postfix(FILE *stream, namespace_t *namespace)
                 unscan(token, stream);
                 jmp_buf env;
                 goto t2; t1: end_stack_push("]", &env);
+                int offset = ftell(stream);
+                int line = file_info.line;
+                int column = file_info.column;
                 list *rlist = syntax_expression(stream, namespace);
+                if (is_static_declaration) {
+                    fseek(stream, offset, SEEK_SET);
+                    file_info.line = line;
+                    file_info.column = column;
+                    syntax_a_conditional(stream, namespace);
+                }
                 token = scan(stream);
                 if (strcmp(token, "]")) {
                     unscan(token, stream);
