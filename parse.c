@@ -6,6 +6,14 @@ int type(void *stmt) {
     return *(int *)stmt;
 }
 
+static_offseted_addr_t *static_offseted_addr_init(static_addr_t *base,  int offset) {
+    static_offseted_addr_t *retptr = malloc(sizeof(static_offseted_addr_t));
+    retptr->type = static_offseted_addr_type;
+    retptr->base = base;
+    retptr->offset = offset;
+    return retptr;
+}
+
 static_addr_t *static_addr_init(int value, int initialized) {
     static_addr_t *retptr = malloc(sizeof(static_addr_t));
     retptr->type = static_addr_type;
