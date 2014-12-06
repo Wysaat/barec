@@ -518,6 +518,16 @@ void addr_gencode(addr *expr)
                 val = bss_addr(storage->ival);
             buff_addln(text_buff, val);
         }
+        else if (type(node->storage) == static_offsetted_storage_type) {
+            static_offsetted_storage_t *storage = node->storage;
+            buff_add(text_buff, "mov eax, ");
+            char *val;
+            if (storage->base->initialized)
+                val = data_addr(storage->base->ival+storage->offset);
+            else
+                val = bss_addr(storage->base->ival+storage->offset);
+            buff_addln(text_buff, val);
+        }
     }
     else if (type(expr->expr) == string_t) {
         string_gencode(expr->expr);
@@ -1314,11 +1324,20 @@ static inline char *constant_value(void *constant)
             return ((arithmetic *)constant)->value;
         case addr_t: {
             declaration *dptr = ((addr *)constant)->expr;
-            static_storage *ss = dptr->storage;
-            if (ss->initialized)
-                return data_addr(ss->ival);
-            else
-                return bss_addr(ss->ival);
+            if (type(dptr->storage) == static_storage_t) {
+                static_storage *ss = dptr->storage;
+                if (ss->initialized)
+                    return data_addr(ss->ival);
+                else
+                    return bss_addr(ss->ival);
+            }
+            else if (type(dptr->storage) == static_offsetted_storage_type) {
+                static_offsetted_storage_t *sos = dptr->storage;
+                if (sos->base->initialized)
+                    return data_addr(sos->base->ival+sos->offset);
+                else
+                    return bss_addr(sos->base->ival+sos->offset);
+            }
         }
     }
 }

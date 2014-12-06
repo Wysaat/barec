@@ -86,7 +86,7 @@ enum types {
     declarator_info_type,
     funcall_struct_ref_type,
     static_addr_type,
-    static_offseted_addr_type,
+    static_offsetted_storage_type,
 };
 
 enum atypes {
@@ -111,11 +111,11 @@ typedef struct static_addr {
     int initialized;
 } static_addr_t;
 
-typedef struct static_offseted_addr {
+typedef struct static_offsetted_storage {
     int type;
-    static_addr_t *base;
+    struct static_storage *base;
     int offset;
-} static_offseted_addr_t;
+} static_offsetted_storage_t;
 
 typedef struct funcall funcall;
 
@@ -591,7 +591,7 @@ auto_storage *auto_storage_add_size_nip(auto_storage *left, struct size *right);
 auto_storage *auto_storage_sub_size_nip(auto_storage *left, struct size *right);
 static_addr_t *static_addr_init(int value, int initialized);
 inline declaration *declaration_copy(declaration *node);
-static_offseted_addr_t *static_offseted_addr_init(static_addr_t *base,  int offset);
+static_offsetted_storage_t *static_offsetted_storage_init(static_storage *base,  int offset);
 
 /*
  * utils.c

@@ -1482,13 +1482,21 @@ void *parse_a_expr(FILE *stream, namespace_t *namespace) {
             }
             else if ((get_type(expr) == pointer_t || get_type(expr) == array_t) && type_is_int(expr2)) {
                 if (type(expr) == addr_t && type(((addr *)expr)->expr) == declaration_t &&
-                          type(((declaration *)((addr *)expr)->expr)->storage) == static_storage_t &&
-                                type(expr2) == arithmetic_t) {
+                          (type(((declaration *)((addr *)expr)->expr)->storage) == static_storage_t ||
+                              type(((declaration *)((addr *)expr)->expr)->storage) == static_offsetted_storage_type) &&
+                                  type(expr2) == arithmetic_t) {
                     declaration *odptr = ((addr *)expr)->expr;
                     declaration *dptr = declaration_copy(odptr);
                     struct size *ss = size(expr);
                     int offset = atoi(((arithmetic *)expr2)->value) * ss->ival;
-                    ((static_storage *)dptr->storage)->ival += offset;
+                    if (btype == sub) offset = -offset;
+                    if (type(odptr->storage) == static_storage_t) {
+                        dptr->storage = static_offsetted_storage_init(odptr->storage, offset);
+                    }
+                    else if (type(odptr->storage) == static_offsetted_storage_type) {
+                        static_offsetted_storage_t *soss = odptr->storage;
+                        dptr->storage = static_offsetted_storage_init(soss->base, soss->offset+offset);
+                    }
                     expr = ADDR(dptr);
                 }
                 else
@@ -1496,13 +1504,20 @@ void *parse_a_expr(FILE *stream, namespace_t *namespace) {
             }
             else if ((get_type(expr2) == pointer_t || get_type(expr2) == array_t) && type_is_int(expr)) {
                 if (type(expr2) == addr_t && type(((addr *)expr2)->expr) == declaration_t &&
-                          type(((declaration *)((addr *)expr2)->expr)->storage) == static_storage_t &&
-                                type(expr) == arithmetic_t) {
+                          (type(((declaration *)((addr *)expr2)->expr)->storage) == static_storage_t ||
+                              type(((declaration *)((addr *)expr2)->expr)->storage) == static_offsetted_storage_type) &&
+                                  type(expr) == arithmetic_t) {
                     declaration *odptr = ((addr *)expr2)->expr;
                     declaration *dptr = declaration_copy(odptr);
                     struct size *ss = size(expr2);
                     int offset = atoi(((arithmetic *)expr)->value) * ss->ival;
-                    ((static_storage *)dptr->storage)->ival += offset;
+                    if (type(odptr->storage) == static_storage_t) {
+                        dptr->storage = static_offsetted_storage_init(odptr->storage, offset);
+                    }
+                    else if (type(odptr->storage) == static_offsetted_storage_type) {
+                        static_offsetted_storage_t *soss = odptr->storage;
+                        dptr->storage = static_offsetted_storage_init(soss->base, soss->offset+offset);
+                    }
                     expr = ADDR(dptr);
                 }
                 expr = BINARY(btype, expr2, BINARY(mul, expr, size_expr(get_type_list(INDIRECTION(expr2)))));
@@ -2224,7 +2239,8 @@ translation_unit_t *parse_translation_unit(FILE *stream)
         declaration *node = ptr->content;
         static_storage *storage = node->storage;
         if (storage->initialized == -1) {
-            node->storage = static_storage_init(bss_size, 0);
+            ((static_storage *)node->storage)->ival = bss_size;
+            ((static_storage *)node->storage)->initialized = 0;
             bss_size += size(node->type_list)->ival;
             list *stmts = list_node();
             list_append(stmts, ASSIGNMENT(ptr->content, 0));

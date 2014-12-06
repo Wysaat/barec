@@ -6,9 +6,9 @@ int type(void *stmt) {
     return *(int *)stmt;
 }
 
-static_offseted_addr_t *static_offseted_addr_init(static_addr_t *base,  int offset) {
-    static_offseted_addr_t *retptr = malloc(sizeof(static_offseted_addr_t));
-    retptr->type = static_offseted_addr_type;
+static_offsetted_storage_t *static_offsetted_storage_init(static_storage *base,  int offset) {
+    static_offsetted_storage_t *retptr = malloc(sizeof(static_offsetted_storage_t));
+    retptr->type = static_offsetted_storage_type;
     retptr->base = base;
     retptr->offset = offset;
     return retptr;
@@ -137,38 +137,53 @@ string *STRING(int address, char *value) {
 void *ARRAY_REF(void *primary, void *expr) {
     list *llist = get_type_list(primary), *rlist = get_type_list(expr);
     int lt = type(llist->content);
-    void *expr2;
     if (lt == pointer_t || lt == array_t) {
-        if (type(primary) == declaration_t && type(((declaration *)primary)->storage) == static_storage_t &&
-                  type(expr) == arithmetic_t) {
+        if (type(primary) == declaration_t && type(expr) == arithmetic_t &&
+                (type(((declaration *)primary)->storage) == static_storage_t ||
+                      type(((declaration *)primary)->storage) == static_offsetted_storage_type)) {
+            declaration *d = primary;
             declaration *dptr = declaration_copy(primary);
-            static_storage *bs = ((declaration *)primary)->storage;
-            struct size *ss = size(primary);
+            struct size *ss = size(d->type_list);
             int v = atoi(((arithmetic *)expr)->value);
-            dptr->storage = static_storage_init(bs->ival+ss->ival*v, bs->initialized);
-            return dptr;
+            if (type(d->storage) == static_storage_t) {
+                dptr->storage = static_offsetted_storage_init(d->storage, ss->ival*v);
+            }
+            else if (type(d->storage) == static_offsetted_storage_type) {
+                static_offsetted_storage_t *ds = d->storage;
+                dptr->storage = static_offsetted_storage_init(ds->base, ds->offset+ss->ival*v);
+            }
+            return INDIRECTION(dptr);
         }
         else {
             void *size = size_expr(llist->next);
-            expr2 = BINARY(add, primary, BINARY(mul, expr, size));
+            void *expr2 = BINARY(add, primary, BINARY(mul, expr, size));
+            return INDIRECTION(expr2);
         }
     }
     else {
-        if (type(expr) == declaration_t && type(((declaration *)expr)->storage) == static_storage_t &&
-                  type(primary) == arithmetic_t) {
+        if (type(expr) == declaration_t && type(primary) == arithmetic_t &&
+                (type(((declaration *)expr)->storage) == static_storage_t) ||
+                    (type(((declaration *)expr)->storage) == static_offsetted_storage_type)) {
+            declaration *d = expr;
             declaration *dptr = declaration_copy(expr);
             static_storage *bs = ((declaration *)expr)->storage;
-            struct size *ss = size(expr);
+            struct size *ss = size(d->type_list);
             int v = atoi(((arithmetic *)primary)->value);
-            dptr->storage = static_storage_init(bs->ival+ss->ival*v, bs->initialized);
-            return dptr;
+            if (type(d->storage) == static_storage_t) {
+                dptr->storage = static_offsetted_storage_init(d->storage, ss->ival*v);
+            }
+            else if (type(d->storage) == static_offsetted_storage_type) {
+                static_offsetted_storage_t *ds = d->storage;
+                dptr->storage = static_offsetted_storage_init(ds->base, ds->offset+ss->ival*v);
+            }
+            return INDIRECTION(dptr);
         }
         else {
             void *size = size_expr(rlist->next);
-            expr2 = BINARY(add, expr, BINARY(mul, primary, size));
+            void *expr2 = BINARY(add, expr, BINARY(mul, primary, size));
+            return INDIRECTION(expr2);
         }
     }
-    return INDIRECTION(expr2);
 }
 
 void storage_add_size(auto_storage *left, struct size *right)
@@ -260,14 +275,21 @@ void *STRUCT_REF(void *primary, char *id) {
         if (!strcmp(node->id, id)) {
             list *type_list = list_init(pointer_init());
             list_extend(type_list, node->type_list);
-            if (type(primary) == declaration_t && type(((declaration *)primary)->storage) == static_storage_t) {
+            if (type(primary) == declaration_t && (type(((declaration *)primary)->storage) == static_storage_t ||
+                    type(((declaration *)primary)->storage) == static_offsetted_storage_type)) {
                 declaration *dptr = declaration_copy(node);
-                static_storage *bs = ((declaration *)primary)->storage;
-                dptr->storage = static_storage_init(bs->ival+offset->ival, bs->initialized);
+                declaration *d = primary;
+                if (type(d->storage) == static_storage_t) {
+                    dptr->storage = static_offsetted_storage_init(d->storage, offset->ival);
+                }
+                else if (type(d->storage) == static_offsetted_storage_type) {
+                    static_offsetted_storage_t *ds = d->storage;
+                    dptr->storage = static_offsetted_storage_init(ds->base, ds->offset+offset->ival);
+                }
                 return dptr;
             }
             else
-                return INDIRECTION(CAST(type_list, BINARY(add, primary, size_to_expr(offset))));
+                return CAST(type_list, BINARY(add, primary, size_to_expr(offset)));
         }
         size_add(offset, size(node->type_list));
     }
@@ -302,8 +324,9 @@ preinc *PREINC(void *expr, int inc) {
 }
 
 void *ADDR(void *expr) {
-    if (type(expr) == indirection_t)
+    if (type(expr) == indirection_t) {
         return ((indirection *)expr)->expr;
+    }
     list *type_list = get_type_list(expr);
     if (type(type_list->content) == function_t)
         return expr;
