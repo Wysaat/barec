@@ -670,6 +670,7 @@ list *parse_parameter_list(FILE *stream, struct namespace *namespace)
     while (1) {
         list *specifiers = parse_specifier(stream, namespace);
         void *storage = specifiers->next->content;
+        storage = parameter_storage_init(0);
         void *specifier = specifiers->next->next->content;
         declarator *d = parse_declarator(stream, abstract, namespace);
         list *type_list = d->type_list, *ptr = type_list;
@@ -2068,7 +2069,7 @@ void *parse_return_stmt(FILE *stream, namespace_t *namespace)
         return RETURN_STMT(CAST(type_list, expr), return_tag);
     }
     else
-        return 0;
+        return RETURN_STMT(0, return_tag);
 }
 
 static function_definition_t *
@@ -2183,7 +2184,18 @@ void *parse_external_declaration(FILE *stream, namespace_t *namespace)
         }
         if (type(storage) == static_storage_t) {
             if (got_eq) {
-                if (initializer) {
+                if (!node) {
+                    node = find_identifier(namespace, id);
+                    if (initializer) {
+                        ((static_storage *)node->storage)->ival = data_size;
+                        ((static_storage *)node->storage)->initialized = 1;
+                    }
+                    else {
+                        ((static_storage *)node->storage)->ival = bss_size;
+                        ((static_storage *)node->storage)->initialized = 0;
+                    }
+                }
+                else if (initializer) {
                     node->storage = static_storage_init(data_size, 1);
                     data_size += size(type_list)->ival;
                 }

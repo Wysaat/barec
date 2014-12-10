@@ -413,56 +413,64 @@
 //     return g;
 // }
 
-int a[3];
-int b = &a;
-struct info {
-    int x;
-    int y;
-    int z;
-};
-struct info c;
-int d = &c;
-int e = &c.z;
+// int a[3];
+// int b = &a;
+// struct info {
+//     int x;
+//     int y;
+//     int z;
+// };
+// struct info c;
+// int d = &c;
+// int e = &c.z;
 // struct info c = { 1, 2, 3 };
 
-// int main()
-// {
-//     printf("&a is %p, &b is %p, &c is %p, &d is %p, &e is %p\n", &a, &b, &c, &d, &e);
-//     return 0;
-// }
+typedef int DType;
 
-// typedef int DType;
+DType realx[20] = {
+    8284, 74404, 44077, 66418, 33098, 53491, 35370, 79928, 53099, 52281, 75523,
+    92977, 57784, 60996, 78689, 49412, 45636, 91283, 7067, 39659
+};
 
-// DType realx[20] = {
-//     8284, 74404, 44077, 66418, 33098, 53491, 35370, 79928, 53099, 52281, 75523,
-//     92977, 57784, 60996, 78689, 49412, 45636, 91283, 7067, 39659
-// };
+int *x = realx; /* allow x to shift for heaps */
+int n = 20;
 
-// int *x = realx; /* allow x to shift for heaps */
-// int n = 20;
+void swap(int i, int j) {
+    DType t = x[i];
+    x[i] = x[j];
+    x[j] = t;
+}
 
-// void swap(int i, int j) {
-//     DType t = x[i];
-//     x[i] = x[j];
-//     x[j] = t;
-// }
+int intcomp(int *x, int *y) {
+    return *x - *y;
+}
 
-// int intcomp(int *x, int *y) {
-//     return *x - *y;
-// }
+//  INSERTION SORTS 
 
-// /* INSERTION SORTS */
+/* Simplest insertion sort */
+void isort1() {
+    int i, j;
+    for (i = 1; i < n; i++)
+        for (j = i; j > 0 && x[j-1] > x[j]; j--)
+            swap(j-1, j);
+}
 
-// /* Simplest insertion sort */
-// void isort1() {
-//     int i, j;
-//     for (i = 1; i < n; i++)
-//         for (j = i; j > 0 && x[j-1] > x[j]; j--)
-//             swap(j-1, j);
-// }
+/* Simplest version, Lomuto partitioning */
+void qsort1(int l, int u)
+{	int i, m;
+	if (l >= u)
+		return;
+	m = l;
+	for (i = l+1; i <= u; i++)
+		if (x[i] < x[l])
+			swap(++m, i);
+	swap(l, m);
+	qsort1(l, m-1);
+	qsort1(m+1, u);
+}
 
-// int main()
-// {
-//     isort1();
-//     return 0;
-// }
+int main()
+{
+    qsort1(0, 19);
+    return 0;
+}

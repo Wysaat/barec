@@ -1317,6 +1317,23 @@ static inline char *init_prefix(int size)
     }
 }
 
+static char *constant_value_subproc(declaration *dptr) {
+    if (type(dptr->storage) == static_storage_t) {
+        static_storage *ss = dptr->storage;
+        if (ss->initialized)
+            return data_addr(ss->ival);
+        else
+            return bss_addr(ss->ival);
+    }
+    else if (type(dptr->storage) == static_offsetted_storage_type) {
+        static_offsetted_storage_t *sos = dptr->storage;
+        if (sos->base->initialized)
+            return data_addr(sos->base->ival+sos->offset);
+        else
+            return bss_addr(sos->base->ival+sos->offset);
+    }
+}
+
 static inline char *constant_value(void *constant)
 {
     switch (type(constant)) {
@@ -1324,20 +1341,11 @@ static inline char *constant_value(void *constant)
             return ((arithmetic *)constant)->value;
         case addr_t: {
             declaration *dptr = ((addr *)constant)->expr;
-            if (type(dptr->storage) == static_storage_t) {
-                static_storage *ss = dptr->storage;
-                if (ss->initialized)
-                    return data_addr(ss->ival);
-                else
-                    return bss_addr(ss->ival);
-            }
-            else if (type(dptr->storage) == static_offsetted_storage_type) {
-                static_offsetted_storage_t *sos = dptr->storage;
-                if (sos->base->initialized)
-                    return data_addr(sos->base->ival+sos->offset);
-                else
-                    return bss_addr(sos->base->ival+sos->offset);
-            }
+            return constant_value_subproc(dptr);
+        }
+        case declaration_t: {
+            declaration *dptr = constant;
+            return constant_value_subproc(dptr);
         }
     }
 }
@@ -1576,7 +1584,8 @@ void break_stmt_gencode(break_stmt *stmt)
 
 void return_stmt_gencode(return_stmt *stmt)
 {
-    gencode(stmt->expr);
+    if (stmt->expr)
+        gencode(stmt->expr);
     buff_add(text_buff, "jmp ");
     buff_addln(text_buff, stmt->tag);
 }
